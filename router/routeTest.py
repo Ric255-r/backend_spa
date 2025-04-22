@@ -30,6 +30,7 @@ async def testing():
 
         column_name = []
         for kol in cursor.description:
+          print(cursor.description)
           column_name.append(kol[0])
 
         df = pd.DataFrame(items, columns=column_name)
