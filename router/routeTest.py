@@ -119,7 +119,7 @@ async def deleteTest(
       
 
 @app.delete('/testing/{id}')
-async def delTest(
+async def deltestalvingblk(
   id : str,
 ):
   try:
