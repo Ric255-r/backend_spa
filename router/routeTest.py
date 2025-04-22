@@ -19,7 +19,7 @@ async def testing():
   try:
     pool = await get_db() # Get The pool
 
-    # Rio suka makan pisang goreng
+    # Alvin suka makan pisang goreng
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
 
