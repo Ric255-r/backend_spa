@@ -79,9 +79,10 @@ async def postTest(
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
 
-@app.delete('/testing/{id}')
+@app.delete('/testing/{id}/{nama}')
 async def deleteTest(
   id : str,
+  nama_barang : str,
   request: Request
 ):
   try:
@@ -93,8 +94,8 @@ async def deleteTest(
           # 1. Start Transaction
 
           # 2. Execute querynya
-          q1 = "DELETE FROM table_test WHERE id = %s"
-          await cursor.execute(q1, (id,))
+          q1 = "DELETE FROM table_test WHERE id = %s or nama_barang = %s"
+          await cursor.execute(q1, (id,nama_barang))
 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
