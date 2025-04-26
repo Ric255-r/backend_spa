@@ -10,12 +10,12 @@ from fastapi_jwt import (
 )
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
-from jwt_auth import access_security, refresh_security, verify_jwt
+from jwt_auth import access_security, refresh_security
 
 # Untuk Routingnya jadi http://192.xx.xx.xx:5500/api/fnb/endpointfunction
 app = APIRouter(
   prefix="/fnb",
-  dependencies=[Depends(verify_jwt)]
+  # dependencies=[Depends(verify_jwt)]
 )
 
 @app.get('/lastId')

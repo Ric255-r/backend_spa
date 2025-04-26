@@ -10,12 +10,10 @@ from fastapi_jwt import (
 )
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
-from jwt_auth import access_security, refresh_security, verify_jwt
 
 # Untuk Routingnya jadi http://192.xx.xx.xx:5500/api/produk/endpointfunction
 app = APIRouter(
   prefix="/produk",
-  dependencies=[Depends(verify_jwt)]
 )
 
 @app.get('/kategoriproduk')

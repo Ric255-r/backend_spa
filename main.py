@@ -4,6 +4,7 @@ from fastapi_jwt import JwtAuthorizationCredentials
 from router.routeTest import app as app_test
 from router.user.login import app as app_login
 from router.transaksi.fnb import app as app_fnb
+from router.admin.regis_produk import app as app_produk
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -23,6 +24,7 @@ main_router = APIRouter()
 main_router.include_router(app_test)
 main_router.include_router(app_login)
 main_router.include_router(app_fnb)
+main_router.include_router(app_produk)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
 
