@@ -24,8 +24,12 @@ async def fnUser(
     async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
         try:
-          query = "SELECT * FROM users WHERE id_user = %s"
-          await cursor.execute(query, (user['id_user'], ))
+          query = """
+            SELECT u.*, k.nama_karyawan, k.jabatan FROM users u 
+            INNER JOIN karyawan k ON u.id_karyawan = k.id_karyawan
+            WHERE u.id_karyawan = %s
+          """
+          await cursor.execute(query, (user['id_karyawan'], ))
 
           column_name = []
           for kol in cursor.description:
@@ -63,8 +67,12 @@ async def login(
           passwd = data['passwd']
 
           # Query Login
-          query = "SELECT * FROM users WHERE id_user = %s"
-          await cursor.execute(query, (data['id_user'], ))
+          query = """
+            SELECT u.*, k.nama_karyawan, k.jabatan FROM users u 
+            INNER JOIN karyawan k ON u.id_karyawan = k.id_karyawan
+            WHERE u.id_karyawan = %s
+          """ 
+          await cursor.execute(query, (data['id_karyawan'], ))
 
           column_names = []
           for kol in cursor.description:
@@ -77,8 +85,8 @@ async def login(
           if not items:
             raise HTTPException(status_code=404, detail="User Not Found")
           
-          # berdasarkan db, attr passwd di index ke-2
-          stored_pass = items[2]
+          # berdasarkan db, attr passwd di index ke-1
+          stored_pass = items[1]
 
           if passwd != stored_pass:
             raise HTTPException(status_code=401, detail="Password Salah")
