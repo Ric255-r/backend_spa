@@ -5,29 +5,30 @@ from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
+import asyncio
 
 app = APIRouter(prefix=("/fnb"))
 
 @app.get('/getkategori')
-async def getkategori(
-  request:Request
-) :
+async def getkategori() :
   try :
     pool = await get_db()
 
     async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
-        q1 = "SELECT id_kategori, nama_kategori FROM kategori_fnb"
+
+        await asyncio.sleep(1)
+
+        q1 = "SELECT id_kategori, nama_kategori FROM kategori_fnb ORDER BY id_kategori DESC"
+
         await cursor.execute(q1)
 
         items = await cursor.fetchall()
 
-        kolom_menu = []
-        for kolom in cursor.description:
-          kolom_menu.append(kolom[0])
-        print(kolom)
-          
-        df = pd.DataFrame(items,columns=kolom_menu)
+        kolom_menu = [kolom[0] for kolom in cursor.description]
+        df = pd.DataFrame(items, columns=kolom_menu)
+
+        # print(" Final fetched items:", items)
         return df.to_dict('records')
   except HTTPException as e:
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
@@ -100,6 +101,7 @@ async def postpaket(
   except Exception as e:
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
+
 async def getlatestidkategori():
   try:
     pool = await get_db() # Get The pool
@@ -146,11 +148,10 @@ async def postkategori(
           data = await request.json()
           q1 = "INSERT INTO kategori_fnb(id_kategori,nama_kategori) VALUES(%s, %s)"
           await cursor.execute(q1, (lastidkategori,data['nama_kategori']))
-
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
-          return "Succes"
+          return "succes"
         except aiomysqlerror as e:
           # Rollback Input Jika Error
 
