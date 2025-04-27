@@ -7,6 +7,9 @@ from router.transaksi.fnb import app as app_fnb
 from router.admin.regis_produk import app as app_produk
 from router.admin.regis_kamar import app as app_room
 from router.admin.regis_pekerja import app as app_pekerja
+from router.admin.daftarfnb import app as app_daftarfnb
+from router.admin.daftarpaketmassage import app as app_daftarpaketmassage
+# from router.transaksi.fnb import app 
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -29,6 +32,9 @@ main_router.include_router(app_fnb)
 main_router.include_router(app_produk)
 main_router.include_router(app_room)
 main_router.include_router(app_pekerja)
+main_router.include_router(app_daftarfnb)
+main_router.include_router(app_daftarpaketmassage)
+# main_router.include_router(app_fnb)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
 

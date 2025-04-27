@@ -47,26 +47,26 @@ async def getLatestTransaksi():
     return JSONResponse({"Error Latest Trans": str(e)}, status_code=500)
   
 
-@app.get('/menu')
-async def getMenu():
-  try:
-    pool = await get_db() # Get The pool
+# @app.get('/menu')
+# async def getMenu():
+#   try:
+#     pool = await get_db() # Get The pool
 
-    async with pool.acquire() as conn:  # Auto Release
-      async with conn.cursor() as cursor:
-        q1 = "SELECT * FROM menu_fnb"
-        await cursor.execute(q1)
+#     async with pool.acquire() as conn:  # Auto Release
+#       async with conn.cursor() as cursor:
+#         q1 = "SELECT * FROM menu_fnb"
+#         await cursor.execute(q1)
 
-        items = await cursor.fetchall()
+#         items = await cursor.fetchall()
 
-        column_name = []
-        for kol in cursor.description:
-          column_name.append(kol[0])
+#         column_name = []
+#         for kol in cursor.description:
+#           column_name.append(kol[0])
 
-        df = pd.DataFrame(items, columns=column_name)
-        return df.to_dict('records')
+#         df = pd.DataFrame(items, columns=column_name)
+#         return df.to_dict('records')
 
-  except Exception as e:
-    return JSONResponse({"Error Get Menu Fnb": str(e)}, status_code=500)
+#   except Exception as e:
+#     return JSONResponse({"Error Get Menu Fnb": str(e)}, status_code=500)
   
   
