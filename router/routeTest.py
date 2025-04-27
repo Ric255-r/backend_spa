@@ -13,6 +13,25 @@ from aiomysql import Error as aiomysqlerror
 
 app = APIRouter()
 
+async def buatSelect(
+  conn, cursor
+) :
+  q1 = "SELECT * FROM table_test"
+  await cursor.execute(q1)
+
+  items = await cursor.fetchall()
+
+  column_name = []
+  for kol in cursor.description:
+    print(cursor.description)
+    column_name.append(kol[0])
+
+  df = pd.DataFrame(items, columns=column_name)
+  print(df)
+  aa = df.to_dict('records')
+  print(aa)
+  return aa
+
 # Syntax ini aman dari RC
 @app.get("/testing")
 async def testing():
@@ -22,20 +41,7 @@ async def testing():
     # Alvin suka makan pisang goreng. versi 2 lebih OP. tes alvin
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
-
-        q1 = "SELECT * FROM table_test"
-        await cursor.execute(q1)
-
-        items = await cursor.fetchall()
-
-        column_name = []
-        for kol in cursor.description:
-          print(cursor.description)
-          column_name.append(kol[0])
-
-        df = pd.DataFrame(items, columns=column_name)
-        return df.to_dict('records')
-
+        return await buatSelect(conn, cursor)
   except HTTPException as e:
     return JSONResponse({"Error": str(e)}, status_code=e.status_code)
   
@@ -62,7 +68,7 @@ async def postTest(
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
-          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
+          return await buatSelect(conn,cursor)
         except aiomysqlerror as e:
           # Rollback Input Jika Error
 
@@ -80,10 +86,10 @@ async def postTest(
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
 
-@app.delete('/testing/{id}/{nama}')
+@app.delete('/testing/{id}/{namabarang}')
 async def deleteTest(
   id : str,
-  nama_barang : str,
+  namabarang : str,
   request: Request
 ):
   try:
@@ -96,12 +102,12 @@ async def deleteTest(
 
           # 2. Execute querynya
           q1 = "DELETE FROM table_test WHERE id = %s or nama_barang = %s"
-          await cursor.execute(q1, (id,nama_barang))
+          await cursor.execute(q1, (id,namabarang))
 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
-          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
+          return await buatSelect(conn,cursor)
         except aiomysqlerror as e:
           # Rollback Input Jika Error
 
@@ -117,40 +123,3 @@ async def deleteTest(
         
   except Exception as e:
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
-      
-
-@app.delete('/testing/{id}')
-async def deltestalvingblk(
-  id : str,
-):
-  try:
-    pool = await get_db()
-
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        try:
-
-          # 2. Execute querynya
-          q1 = "DELETE FROM table_test WHERE id = %s"
-          await cursor.execute(q1, (id))
-
-          # 3. Klo Sukses, dia bkl save ke db
-          await conn.commit()
-
-          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Dihapus"}, status_code=200)
-        except aiomysqlerror as e:
-          # Rollback Input Jika Error
-
-          # Ambil Error code
-          error_code = e.args[0] if e.args else "Unknown"
-          
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
-        
-        except Exception as e:
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
-        
-  except Exception as e:
-    return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
-
