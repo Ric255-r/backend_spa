@@ -14,9 +14,12 @@ async def getkategori() :
   try :
     pool = await get_db()
 
+    await asyncio.sleep(1)
+
     async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
-        await cursor.execute("COMMIT;")
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        # await cursor.execute("COMMIT;")
 
         q1 = "SELECT id_kategori, nama_kategori FROM kategori_fnb ORDER BY id_kategori DESC"
 
@@ -78,7 +81,7 @@ async def postpaket(
           # 2. Execute querynya
           data = await request.json()
           q1 = "INSERT INTO menu_fnb(id_fnb,nama_fnb, harga_fnb,id_kategori,status_fnb) VALUES(%s, %s, %s, %s, %s)"
-          await cursor.execute(q1, (lastidfnb,data['nama_fnb'], data['harga_fnb'], data['id_kategori'],data['status']))
+          await cursor.execute(q1, (lastidfnb,data['nama_fnb'], data['harga_fnb'], data['id_kategori'],data['status_fnb']))
 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
@@ -98,7 +101,7 @@ async def postpaket(
           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
   except Exception as e:
-    return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
 
 async def getlatestidkategori():
@@ -151,7 +154,7 @@ async def postkategori(
           await conn.commit()
 
           return "succes"
-        except aiomysqlerror as e:
+        except aiomysqlerror.MySQLError as e:
           # Rollback Input Jika Error
 
           # Ambil Error code
@@ -162,7 +165,32 @@ async def postkategori(
         
         except Exception as e:
           await conn.rollback()
+          print(f"Error during insert : {e}")
           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
   except Exception as e:
-    return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+
+@app.get('/getfnb')
+async def getfnb() :
+  try :
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        # await cursor.execute("COMMIT;")
+
+        q1 = "SELECT * FROM menu_fnb ORDER BY id_fnb DESC"
+
+        await cursor.execute(q1)
+
+        items = await cursor.fetchall()
+
+        kolom_menu = [kolom[0] for kolom in cursor.description]
+        df = pd.DataFrame(items, columns=kolom_menu)
+
+        # print(" Final fetched items:", items)
+        return df.to_dict('records')
+  except HTTPException as e:
+   return JSONResponse({"Error": str(e)}, status_code=e.status_code)
