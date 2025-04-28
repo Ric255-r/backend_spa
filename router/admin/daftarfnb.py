@@ -16,8 +16,7 @@ async def getkategori() :
 
     async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
-
-        await asyncio.sleep(1)
+        await cursor.execute("COMMIT;")
 
         q1 = "SELECT id_kategori, nama_kategori FROM kategori_fnb ORDER BY id_kategori DESC"
 

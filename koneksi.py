@@ -54,13 +54,20 @@ async def lifespan(app: FastAPI):
 
     print("Database connection pool created")
 
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+
     yield
     # shutdown, close pool
     if pool:
-      pool.close()
-      await pool.wait_closed()
-
-      print("Database Pool Ditutup")
+      try:
+        pool.close()
+        await pool.wait_closed()
+        print("Database Pool Ditutup")
+      except Exception as e:
+        print(f"Error closing database pool: {e}")
 
 
 async def get_db():
