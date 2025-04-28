@@ -9,6 +9,7 @@ from router.admin.regis_kamar import app as app_room
 from router.admin.regis_pekerja import app as app_pekerja
 from router.admin.daftarfnb import app as app_daftarfnb
 from router.admin.daftarpaketmassage import app as app_daftarpaketmassage
+from router.admin.daftarproduk import app as app_daftarproduk
 # from router.transaksi.fnb import app 
 from jwt_auth import access_security
 
@@ -34,6 +35,7 @@ main_router.include_router(app_room)
 main_router.include_router(app_pekerja)
 main_router.include_router(app_daftarfnb)
 main_router.include_router(app_daftarpaketmassage)
+main_router.include_router(app_daftarproduk)
 # main_router.include_router(app_fnb)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)

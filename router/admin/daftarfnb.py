@@ -17,21 +17,20 @@ async def getkategori() :
     await asyncio.sleep(1)
 
     async with pool.acquire() as conn:
-      # await conn.ping(reconnect=True)
-
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         # await cursor.execute("COMMIT;")
 
         q1 = "SELECT id_kategori, nama_kategori FROM kategori_fnb ORDER BY id_kategori DESC"
+
         await cursor.execute(q1)
+
         items = await cursor.fetchall()
-        
-        # Log the fetched items
-        print("Fetched items:", items)
 
         kolom_menu = [kolom[0] for kolom in cursor.description]
         df = pd.DataFrame(items, columns=kolom_menu)
+
+        # print(" Final fetched items:", items)
         return df.to_dict('records')
   except HTTPException as e:
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
@@ -141,17 +140,16 @@ async def postkategori(
     pool = await get_db()
 
     async with pool.acquire() as conn:
-  
-
       async with conn.cursor() as cursor:
         try:
-          await conn.begin()  # Start a transaction
-          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")    
+          # 1. Start Transaction
+          await conn.begin()
+          lastidkategori = await getlatestidkategori()
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO kategori_fnb(nama_kategori) VALUES(%s)"
-          await cursor.execute(q1, (data['nama_kategori'], ))
+          q1 = "INSERT INTO kategori_fnb(id_kategori,nama_kategori) VALUES(%s, %s)"
+          await cursor.execute(q1, (lastidkategori,data['nama_kategori']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
