@@ -24,11 +24,11 @@ async def getlastestidproduk():
 
         if id_produk is None:
           num = "1"
-          strpad = "M" + num.zfill(3)
+          strpad = "P" + num.zfill(3)
         else:
           getNum = id_produk[1:]
           num = int(getNum) + 1
-          strpad = "M" + str(num).zfill(3)
+          strpad = "P" + str(num).zfill(3)
 
         return strpad
 
@@ -75,3 +75,27 @@ async def postpaket(
         
   except Exception as e:
     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+
+@app.get('/getnamaproduk')
+async def getnamaproduk() :
+  try :
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        # await cursor.execute("COMMIT;")
+
+        q1 = "SELECT nama_produk FROM menu_produk ORDER BY id_produk DESC"
+
+        await cursor.execute(q1)
+
+        items = await cursor.fetchall()
+
+        kolom_menu = [kolom[0] for kolom in cursor.description]
+        df = pd.DataFrame(items, columns=kolom_menu)
+
+        # print(" Final fetched items:", items)
+        return df.to_dict('records')
+  except HTTPException as e:
+   return JSONResponse({"Error": str(e)}, status_code=e.status_code)

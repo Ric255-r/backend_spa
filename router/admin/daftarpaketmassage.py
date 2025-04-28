@@ -73,4 +73,28 @@ async def postpaketmassage(
           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
   except Exception as e:
-    return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+@app.get('/getnamapaketmassage')
+async def getnamapaketmassage() :
+  try :
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        # await cursor.execute("COMMIT;")
+
+        q1 = "SELECT nama_paket_msg FROM paket_massage ORDER BY id_paket_msg DESC"
+
+        await cursor.execute(q1)
+
+        items = await cursor.fetchall()
+
+        kolom_menu = [kolom[0] for kolom in cursor.description]
+        df = pd.DataFrame(items, columns=kolom_menu)
+
+        # print(" Final fetched items:", items)
+        return df.to_dict('records')
+  except HTTPException as e:
+   return JSONResponse({"Error": str(e)}, status_code=e.status_code)
