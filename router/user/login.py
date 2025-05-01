@@ -26,7 +26,7 @@ async def fnUser(
         try:
           query = """
             SELECT u.*, k.nama_karyawan, k.jabatan FROM users u 
-            INNER JOIN karyawan k ON u.id_karyawan = k.id_karyawan
+            LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
             WHERE u.id_karyawan = %s
           """
           await cursor.execute(query, (user['id_karyawan'], ))
@@ -41,7 +41,24 @@ async def fnUser(
           df = pd.DataFrame(items, columns=column_name)
 
           # Jadikan json
-          subject = df.to_dict('records')[0] # pecahkan arraynya
+          records = df.to_dict('records')
+
+          if not records:
+            return JSONResponse(
+                content={"status": "error", "message": "Data tidak ditemukan"},
+                status_code=404
+            )
+
+          subject = records[0]
+
+          # Jika hak akses user adalah ruangan. tambahkan keyvalue lagi
+          if user['hak_akses'] == "ruangan":
+            subject['id_ruangan'] = user['id_ruangan']
+            subject['id_akun_ruangan'] = user['id_akun_ruangan']
+            subject['nama_ruangan'] = user['nama_ruangan']
+            subject['lantai'] = user['lantai']
+            subject['jenis_ruangan'] = user['jenis_ruangan']
+            subject['status'] = user['status']
 
           # Pop password
           subject.pop('passwd', None)
@@ -69,7 +86,7 @@ async def login(
           # Query Login
           query = """
             SELECT u.*, k.nama_karyawan, k.jabatan FROM users u 
-            INNER JOIN karyawan k ON u.id_karyawan = k.id_karyawan
+            LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
             WHERE u.id_karyawan = %s
           """ 
           await cursor.execute(query, (data['id_karyawan'], ))
@@ -102,9 +119,32 @@ async def login(
           subject.pop('created_at', None)
           subject.pop('updated_at', None)
 
-          # Buat Token. penghubung antara frontend dan backend
-          access_token = access_security.create_access_token(subject)
-          refresh_token = refresh_security.create_refresh_token(subject)
+          if subject['hak_akses'] == "ruangan":
+            query2 = """
+              SELECT * FROM ruangan WHERE id_karyawan = %s LIMIT 1
+            """ 
+            await cursor.execute(query2, (subject['id_karyawan'], ))
+
+            # Pake await fetchone, krn hanya mw ambil 1 baris data. klo mw baanyak make fetchall
+            items2 = await cursor.fetchone()
+            # print(items2)
+
+            # Masukin Data dari tabel ruangan utk login
+            subject['id_ruangan'] = items2[0]
+            subject['id_akun_ruangan'] = items2[1]
+            subject['nama_ruangan'] = items2[2]
+            subject['lantai'] = items2[3]
+            subject['jenis_ruangan'] = items2[4]
+            subject['status'] = items2[5] 
+
+            # Buat Token. penghubung antara frontend dan backend
+            # Terpaksa ku buat di blok if dan else. terkesan redudant. tapi begini jalan
+            # klo cmn if doang, dia ga ke store data tambahannya
+            access_token = access_security.create_access_token(subject)
+            refresh_token = refresh_security.create_refresh_token(subject)
+          else:
+            access_token = access_security.create_access_token(subject)
+            refresh_token = refresh_security.create_refresh_token(subject)
 
           return {
             "data_user": subject,
