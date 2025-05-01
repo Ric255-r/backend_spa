@@ -13,7 +13,14 @@ from router.admin.daftarfasilitas import app as app_daftarfasilitas
 from router.admin.daftarpromo import app as app_daftarpromo
 from router.admin.listpaketmassage import app as app_listpaketmassage
 from router.admin.listpaketfnb import app as app_listfnb
+from router.admin.regis_users import app as app_regisusers
+from router.admin.list_pekerja import app as app_listpekerja
+from router.admin.list_room import app as app_listroom
 # from router.transaksi.fnb import app 
+from router.admin.daftarproduk import app as app_daftarproduk
+from router.transaksi.kitchen import app as app_kitchen
+from router.ob.start_kerja import app as app_ob
+from router.terapis.kamar_terapis import app as app_kamarterapis
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -37,11 +44,18 @@ main_router.include_router(app_room)
 main_router.include_router(app_pekerja)
 main_router.include_router(app_daftarfnb)
 main_router.include_router(app_daftarpaketmassage)
+main_router.include_router(app_regisusers)
+main_router.include_router(app_listpekerja)
+main_router.include_router(app_listroom)
 main_router.include_router(app_daftarproduk)
 main_router.include_router(app_daftarfasilitas)
 main_router.include_router(app_daftarpromo)
 main_router.include_router(app_listpaketmassage)
 main_router.include_router(app_listfnb)
+main_router.include_router(app_kitchen)
+main_router.include_router(app_ob)
+main_router.include_router(app_kamarterapis)
+
 # main_router.include_router(app_fnb)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)

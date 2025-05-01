@@ -19,8 +19,6 @@ def read_config(filename):
       else:
         print(f"Error: Incorrect number of elements in the line. Expected 4, found {len(parts)}.")
         return None
-      
-result = read_config('koneksi_config.txt')
 
 # Initialize connection pool at module level
 pool = None
@@ -43,6 +41,7 @@ async def lifespan(app: FastAPI):
       maxsize=13, # Max 13 connections under load
       pool_recycle=3600, # Recycle connections every 1h
       connect_timeout=10,  # Timeout for establishing new connections
+      echo=True, # Utk Debug Sql
     )
     
     """
