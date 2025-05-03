@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_jwt import JwtAuthorizationCredentials
 from router.routeTest import app as app_test
 from router.user.login import app as app_login
-# from router.transaksi.fnb import app as app_fnb
+from router.transaksi.fnb import app as app_fnb
 from router.admin.regis_kamar import app as app_room
 from router.admin.regis_pekerja import app as app_pekerja
 from router.admin.daftarfnb import app as app_daftarfnb
@@ -41,7 +41,7 @@ main_router = APIRouter()
 
 main_router.include_router(app_test)
 main_router.include_router(app_login)
-# main_router.include_router(app_fnb)
+main_router.include_router(app_fnb)
 main_router.include_router(app_room)
 main_router.include_router(app_pekerja)
 main_router.include_router(app_daftarfnb)
