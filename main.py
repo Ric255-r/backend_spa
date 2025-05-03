@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_jwt import JwtAuthorizationCredentials
 from router.routeTest import app as app_test
 from router.user.login import app as app_login
-from router.transaksi.fnb import app as app_fnb
+# from router.transaksi.fnb import app as app_fnb
 from router.admin.regis_kamar import app as app_room
 from router.admin.regis_pekerja import app as app_pekerja
 from router.admin.daftarfnb import app as app_daftarfnb
@@ -18,8 +18,9 @@ from router.admin.list_pekerja import app as app_listpekerja
 from router.admin.list_room import app as app_listroom
 # from router.transaksi.fnb import app 
 from router.admin.daftarproduk import app as app_daftarproduk
-from router.transaksi.kitchen import app as app_kitchen
-from router.ob.start_kerja import app as app_ob
+from router.admin.listproduk import app as app_listproduk
+# from router.transaksi.kitchen import app as app_kitchen
+# from router.ob.start_kerja import app as app_ob
 from router.terapis.kamar_terapis import app as app_kamarterapis
 from jwt_auth import access_security
 
@@ -39,7 +40,7 @@ main_router = APIRouter()
 
 main_router.include_router(app_test)
 main_router.include_router(app_login)
-main_router.include_router(app_fnb)
+# main_router.include_router(app_fnb)
 main_router.include_router(app_room)
 main_router.include_router(app_pekerja)
 main_router.include_router(app_daftarfnb)
@@ -52,9 +53,10 @@ main_router.include_router(app_daftarfasilitas)
 main_router.include_router(app_daftarpromo)
 main_router.include_router(app_listpaketmassage)
 main_router.include_router(app_listfnb)
-main_router.include_router(app_kitchen)
-main_router.include_router(app_ob)
+# main_router.include_router(app_kitchen)
+# main_router.include_router(app_ob)
 main_router.include_router(app_kamarterapis)
+main_router.include_router(app_listproduk)
 
 # main_router.include_router(app_fnb)
 # main_router.include_router(app_transaction)
@@ -69,4 +71,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="10.10.10.226", port=5500)
+  uvicorn.run(app, host="192.168.210.54", port=5500)
