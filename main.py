@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_jwt import JwtAuthorizationCredentials
 from router.routeTest import app as app_test
 from router.user.login import app as app_login
-# from router.transaksi.fnb import app as app_fnb
+from router.transaksi.fnb import app as app_fnb
 from router.admin.regis_kamar import app as app_room
 from router.admin.regis_pekerja import app as app_pekerja
 from router.admin.daftarfnb import app as app_daftarfnb
@@ -21,9 +21,14 @@ from router.admin.laporan_ob import app as app_laporanob
 from router.admin.daftarproduk import app as app_daftarproduk
 from router.transaksi.kitchen import app as app_kitchen
 from router.admin.listproduk import app as app_listproduk
+from router.admin.listfasilitas import app as app_listfasilitas
+from router.admin.selectsearch import app as app_selectsearch
 # from router.transaksi.kitchen import app as app_kitchen
 # from router.ob.start_kerja import app as app_ob
+from router.transaksi.kitchen import app as app_kitchen
+from router.ob.start_kerja import app as app_ob
 from router.terapis.kamar_terapis import app as app_kamarterapis
+from router.admin.list_user import app as app_datauser
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -42,7 +47,7 @@ main_router = APIRouter()
 
 main_router.include_router(app_test)
 main_router.include_router(app_login)
-# main_router.include_router(app_fnb)
+main_router.include_router(app_fnb)
 main_router.include_router(app_room)
 main_router.include_router(app_pekerja)
 main_router.include_router(app_daftarfnb)
@@ -59,9 +64,13 @@ main_router.include_router(app_listfnb)
 main_router.include_router(app_laporanob)
 # main_router.include_router(app_kitchen)
 # main_router.include_router(app_ob)
+main_router.include_router(app_kitchen)
+main_router.include_router(app_ob)
 main_router.include_router(app_kamarterapis)
+main_router.include_router(app_datauser)
 main_router.include_router(app_listproduk)
-
+main_router.include_router(app_listfasilitas)
+main_router.include_router(app_selectsearch)
 # main_router.include_router(app_fnb)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
