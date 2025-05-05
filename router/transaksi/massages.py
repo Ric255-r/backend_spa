@@ -74,7 +74,6 @@ async def getPaket():
     return JSONResponse({"Error Get Produk Massage": str(e)}, status_code=500)
 
 
-# Blm Bs, Mw bahas
 @app.post('/store')
 async def storeData(
   request: Request
@@ -111,8 +110,11 @@ async def storeData(
           # awalnya diambil dari variabel num
           new_id_dt = "DT" + str(milliseconds_local).zfill(16)
 
-          # 3. Execute query DT
+          # 3. Execute query 
           data = await request.json()
+          # data main transaksi
+          jenis_pembayaran = data['jenis_pembayaran']
+          status_trans = data['status']
 
           # Pecah kedalam bentuk list, krna detail_trans bentuk array
           # Query Masukin Ke DetailTrans
@@ -131,7 +133,7 @@ async def storeData(
               """
               await cursor.execute(q2, 
                 (new_id_dt, item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
-                 item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], item['status'], item['is_addon'])
+                 item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], status_trans, item['is_addon'])
               )
             else:
               q2 = """
@@ -146,41 +148,57 @@ async def storeData(
               """
               await cursor.execute(q2, (
                 new_id_dt, item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
-                item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], item['status'], item['is_addon']
+                item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], status_trans, item['is_addon']
               ))
 
-          #Query Masukin ke Transaksi
-          if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
-            q3 = """
-              UPDATE main_transaksi
-              SET
-                id_loker = %s, jenis_transaksi = %s, id_detail_transaksi = %s, total_harga = %s, disc = %s, 
-                grand_total = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
-                nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, status = %s
-              WHERE id_transaksi = %s
-            """
-            await cursor.execute(q3, (
-              2, 'massage', new_id_dt, data['total_harga'], data['disc'], 
-              data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
-              data['nama_bank'], data['jumlah_bayar'], 0, 'stored',
-              data['id_transaksi']  # <- moved to last parameter because it's in WHERE
-            ))
+          # false = awal
+          if jenis_pembayaran == False:
+            #Query Masukin ke Transaksi
+            if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
+              q3 = """
+                UPDATE main_transaksi
+                SET
+                  id_loker = %s, jenis_transaksi = %s, id_detail_transaksi = %s, total_harga = %s, disc = %s, 
+                  grand_total = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
+                  nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
+                WHERE id_transaksi = %s
+              """
+              await cursor.execute(q3, (
+                2, 'massage', new_id_dt, data['total_harga'], data['disc'], 
+                data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
+                data['nama_bank'], data['jumlah_bayar'], 0, jenis_pembayaran, status_trans,
+                data['id_transaksi']  # <- moved to last parameter because it's in WHERE
+              ))
+            else:
+              q3 = """
+                UPDATE main_transaksi
+                SET
+                  id_loker = %s, jenis_transaksi = %s, id_detail_transaksi = %s, total_harga = %s, disc = %s, 
+                  grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
+                  jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
+                WHERE id_transaksi = %s
+              """
+              await cursor.execute(q3, (
+                2, 'massage', new_id_dt, data['total_harga'], data['disc'], 
+                data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
+                data['jumlah_bayar'] - data['grand_total'], jenis_pembayaran, status_trans,
+                data['id_transaksi']  # <- moved to last parameter because it's in WHERE
+              ))
           else:
-
             q3 = """
               UPDATE main_transaksi
               SET
                 id_loker = %s, jenis_transaksi = %s, id_detail_transaksi = %s, total_harga = %s, disc = %s, 
-                grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
-                jumlah_kembalian = %s, status = %s
+                grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, jumlah_kembalian = %s, 
+                jenis_pembayaran = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
               2, 'massage', new_id_dt, data['total_harga'], data['disc'], 
-              data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
-              data['jumlah_bayar'] - data['grand_total'], 'stored',
+              data['grand_total'], "-", 0, 0, jenis_pembayaran,  status_trans,
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
+
 
           # Masukin ke tabel kitchen juga
           # q4 = """
