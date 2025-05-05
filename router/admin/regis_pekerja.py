@@ -80,8 +80,8 @@ async def postPekerja(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, umur, jk, no_hp, jabatan, kontrak_img) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-          await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['umur'], data['jk'], data['no_hp'], data['jabatan'], data['kontrak_img'])) 
+          q1 = "INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+          await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['jabatan'], data['status'], data['kontrak_img'])) 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
@@ -117,8 +117,8 @@ async def postOb(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, umur, jk, no_hp, jabatan, kontrak_img) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-          await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['umur'], data['jk'], data['no_hp'], data['jabatan'], data['kontrak_img'])) 
+          q1 = "INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+          await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['jabatan'], data['status'], data['kontrak_img'])) 
           q2 = "INSERT INTO hari_kerja_ob (kode_ob, senin, selasa, rabu, kamis, jumat, sabtu, minggu) VALUES(%s, %s, %s, %s, %s, %s, %s, %s)"
           await cursor.execute(q2, (data['id_karyawan'], data['senin'], data['selasa'], data['rabu'], data['kamis'], data['jumat'], data['sabtu'], data['minggu']))
           # 3. Klo Sukses, dia bkl save ke db
@@ -156,8 +156,8 @@ async def postTerapis(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, umur, jk, no_hp, jabatan, kontrak_img) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-          await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['umur'], data['jk'], data['no_hp'], data['jabatan'], data['kontrak_img'])) 
+          q1 = "INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+          await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['jabatan'], data['status'],  data['kontrak_img'])) 
           q2 = "INSERT INTO hari_kerja_terapis (kode_terapis, senin, selasa, rabu, kamis, jumat, sabtu, minggu) VALUES(%s, %s, %s, %s, %s, %s, %s, %s)"
           await cursor.execute(q2, (data['id_karyawan'], data['senin'], data['selasa'], data['rabu'], data['kamis'], data['jumat'], data['sabtu'], data['minggu']))
           # 3. Klo Sukses, dia bkl save ke db

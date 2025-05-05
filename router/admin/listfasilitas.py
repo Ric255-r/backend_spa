@@ -1,47 +1,41 @@
 from typing import Optional
 import uuid
-from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile
+from fastapi import APIRouter, File, Form, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
-from fastapi_jwt import (
-  JwtAccessBearerCookie,
-  JwtAuthorizationCredentials,
-  JwtRefreshBearer
-)
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
+import asyncio
 
-app = APIRouter(
-  prefix="/listroom",
-)
+app = APIRouter(prefix=("/listfasilitas"))
 
-@app.get('/dataroom')
-async def getDataRoom():
-  try:
-    pool = await get_db() # Get The pool
+@app.get('/getdatafasilitas')
+async def getdatafasilitas() :
+  try :
+    pool = await get_db()
 
-    async with pool.acquire() as conn:  # Auto Release
+    async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
-        q1 = "SELECT * FROM ruangan ORDER BY nama_ruangan ASC"
-        await cursor.execute(q1)
+        # await cursor.execute("COMMIT;")
+
+        q1 = "SELECT * FROM paket_fasilitas ORDER BY id_fasilitas ASC"
+
+        await cursor.execute(q1)  
 
         items = await cursor.fetchall()
 
-        column_name = []
-        for kol in cursor.description:
-          column_name.append(kol[0])
+        kolom_menu = [kolom[0] for kolom in cursor.description]
+        df = pd.DataFrame(items, columns=kolom_menu)
 
-        df = pd.DataFrame(items, columns=column_name)
+        # print(" Final fetched items:", items)
         return df.to_dict('records')
+  except HTTPException as e:
+   return JSONResponse({"Error": str(e)}, status_code=e.status_code)
 
-  except Exception as e:
-    return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
-  
 
-@app.put('/update_room/{id_ruangan}')
-async def putRuangan(
-  id_ruangan: int,
+@app.put('/updatefasilitas')
+async def updatefasilitas(
   request: Request
 ):
   try:
@@ -55,20 +49,13 @@ async def putRuangan(
 
           # 2. Execute querynya
           data = await request.json()
-          await cursor.execute("SELECT * FROM ruangan WHERE id_ruangan = %s", (id_ruangan,))
-          exists = await cursor.fetchone()
-
-          if not exists:
-              await conn.rollback()
-              return JSONResponse(content={"status": "Error", "message": "Id Ruangan not found"}, status_code=404)
-          
-          q1 = "UPDATE ruangan SET nama_ruangan = %s, lantai = %s, jenis_ruangan = %s WHERE id_ruangan = %s"
-          await cursor.execute(q1, (data['nama_ruangan'], data['lantai'], data['jenis_ruangan'], id_ruangan)) 
+          q1 = "UPDATE paket_fasilitas SET nama_fasilitas = %s, harga_fasilitas = %s  WHERE id_fasilitas= %s"
+          await cursor.execute(q1, (data['nama_fasilitas'],data['harga_fasilitas'],data['id_fasilitas']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
-          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diupdate"}, status_code=200)
-        except aiomysqlerror as e:
+          return "succes"
+        except aiomysqlerror.MySQLError as e:
           # Rollback Input Jika Error
 
           # Ambil Error code
@@ -79,14 +66,14 @@ async def putRuangan(
         
         except Exception as e:
           await conn.rollback()
+          print(f"Error during insert : {e}")
           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
   except Exception as e:
     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
   
-@app.delete('/delete_room/{id_ruangan}')
-async def deleteRoom(
-  id_ruangan: int,
+@app.delete('/deletefasilitas')
+async def deletefasilitas(
   request: Request
 ):
   try:
@@ -100,14 +87,13 @@ async def deleteRoom(
 
           # 2. Execute querynya
           data = await request.json()
-          
-          q1 = "DELETE FROM ruangan WHERE id_ruangan = %s"
-          await cursor.execute(q1, (id_ruangan)) 
+          q1 = "DELETE FROM paket_fasilitas WHERE id_fasilitas = %s"
+          await cursor.execute(q1, (data['id_fasilitas']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
-          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Dihapus"}, status_code=200)
-        except aiomysqlerror as e:
+          return "succes"
+        except aiomysqlerror.MySQLError as e:
           # Rollback Input Jika Error
 
           # Ambil Error code
@@ -118,6 +104,7 @@ async def deleteRoom(
         
         except Exception as e:
           await conn.rollback()
+          print(f"Error during insert : {e}")
           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
   except Exception as e:

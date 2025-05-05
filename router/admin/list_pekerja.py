@@ -110,8 +110,8 @@ async def putPekerja(
           #     await conn.rollback()
           #     return JSONResponse(content={"status": "Error", "message": "Karyawan not found"}, status_code=404)
           
-          q1 = "UPDATE karyawan SET nik = %s, nama_karyawan = %s, alamat = %s, umur = %s, jk = %s, no_hp = %s WHERE id_karyawan = %s"
-          await cursor.execute(q1, (data['nik'], data['nama_karyawan'], data['alamat'], data['umur'], data['jk'], data['no_hp'], id_karyawan)) 
+          q1 = "UPDATE karyawan SET nik = %s, nama_karyawan = %s, alamat = %s, jk = %s, no_hp = %s, status = %s WHERE id_karyawan = %s"
+          await cursor.execute(q1, (data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['status'], id_karyawan)) 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 

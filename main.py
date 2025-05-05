@@ -16,9 +16,15 @@ from router.admin.listpaketfnb import app as app_listfnb
 from router.admin.regis_users import app as app_regisusers
 from router.admin.list_pekerja import app as app_listpekerja
 from router.admin.list_room import app as app_listroom
+from router.admin.laporan_ob import app as app_laporanob
 # from router.transaksi.fnb import app 
 from router.admin.daftarproduk import app as app_daftarproduk
+from router.transaksi.kitchen import app as app_kitchen
 from router.admin.listproduk import app as app_listproduk
+from router.admin.listfasilitas import app as app_listfasilitas
+from router.admin.selectsearch import app as app_selectsearch
+from router.transaksi.kitchen import app as app_kitchen
+from router.ob.start_kerja import app as app_ob
 from router.transaksi.kitchen import app as app_kitchen
 from router.ob.start_kerja import app as app_ob
 from router.terapis.kamar_terapis import app as app_kamarterapis
@@ -52,10 +58,12 @@ main_router.include_router(app_regisusers)
 main_router.include_router(app_listpekerja)
 main_router.include_router(app_listroom)
 main_router.include_router(app_daftarproduk)
+main_router.include_router(app_kitchen)
 main_router.include_router(app_daftarfasilitas)
 main_router.include_router(app_daftarpromo)
 main_router.include_router(app_listpaketmassage)
 main_router.include_router(app_listfnb)
+main_router.include_router(app_laporanob)
 main_router.include_router(app_kitchen)
 main_router.include_router(app_ob)
 main_router.include_router(app_kamarterapis)
@@ -63,7 +71,8 @@ main_router.include_router(app_datauser)
 main_router.include_router(app_listproduk)
 main_router.include_router(app_transaksimassage)
 main_router.include_router(app_idtrans)
-
+main_router.include_router(app_listfasilitas)
+main_router.include_router(app_selectsearch)
 # main_router.include_router(app_fnb)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
