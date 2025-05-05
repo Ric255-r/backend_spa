@@ -1,8 +1,8 @@
+import asyncio
 import json
-import time
 from typing import Optional
 import uuid
-from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
 from fastapi_jwt import (
@@ -13,75 +13,27 @@ from fastapi_jwt import (
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
 from jwt_auth import access_security, refresh_security, verify_jwt
+import calendar
+import time
 
 # Untuk Routingnya jadi http://192.xx.xx.xx:5500/api/fnb/endpointfunction
 app = APIRouter(
-  prefix="/fnb",
+  prefix="/massages",
   # dependencies=[Depends(verify_jwt)]
 )
 
-
-# Penggantinya Create Draft Transaksi
-# @app.get('/lastId')
-# async def getLatestTransaksi():
-#   try:
-#     pool = await get_db() # Get The pool
-
-#     async with pool.acquire() as conn:  # Auto Release
-#       async with conn.cursor() as cursor:
-
-#         q1 = """
-#           SELECT id_transaksi FROM main_transaksi 
-#           WHERE id_transaksi LIKE 'TF%' 
-#           ORDER BY CAST(SUBSTRING(id_transaksi, 3) AS UNSIGNED) DESC
-#           LIMIT 1
-#           FOR UPDATE
-#         """
-#         await cursor.execute(q1)
-
-#         items = await cursor.fetchone() #id transaksi terletak di index ke-0
-#         id_trans = items[0] if items is not None else None
-
-#         if id_trans is None:
-#           num = "1"
-#           strpad = "TF" + num.zfill(4)
-#         else:
-#           getNum = id_trans[2:]
-#           num = int(getNum) + 1
-#           strpad = "TF" + str(num).zfill(4)
-
-#         return strpad
-
-
-#   except Exception as e:
-#     return JSONResponse({"Error Latest Trans": str(e)}, status_code=500)
-
-kitchen_connection = []
-
-@app.websocket("/ws-kitchen")
-async def kitchen_ws(
-  websocket: WebSocket
-):
-  await websocket.accept()
-  kitchen_connection.append(websocket)
-  try:
-    # Bikin Koneksi Ttp Nyala
-    print("Hai Ws Nyala")
-    await websocket.receive_text()
-
-  except WebSocketDisconnect :
-    kitchen_connection.remove(websocket)
-  
-
-
-@app.get('/menu')
-async def getMenu():
+@app.get('/paket')
+async def getPaket():
   try:
     pool = await get_db() # Get The pool
 
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
-        q1 = "SELECT * FROM menu_fnb"
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+
+        # await asyncio.sleep(0.3)
+
+        q1 = "SELECT * FROM paket_massage"
         await cursor.execute(q1)
 
         items = await cursor.fetchall()
@@ -94,8 +46,35 @@ async def getMenu():
         return df.to_dict('records')
 
   except Exception as e:
-    return JSONResponse({"Error Get Menu Fnb": str(e)}, status_code=500)
+    return JSONResponse({"Error Get Paket Massage": str(e)}, status_code=500)
   
+
+@app.get('/produk')
+async def getPaket():
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+
+        q1 = "SELECT * FROM menu_produk"
+        await cursor.execute(q1)
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Produk Massage": str(e)}, status_code=500)
+
+
+# Blm Bs, Mw bahas
 @app.post('/store')
 async def storeData(
   request: Request
@@ -124,9 +103,8 @@ async def storeData(
           #     getNum = id_dt[2:]  # Remove 'DT' and get number
           #     num = int(getNum) + 1
 
-          # new_id_dt = "DT" + str(num).zfill(4)
-
-          # Samain dengan kode detailtransaksi massage
+          # Karena tabel detail terpisah pisah, ga mungkin query diatas bs jalan. sehingga alternativeny get time now milisecond aj
+          # Get current time in seconds since epoch (local time)
           seconds_local = time.time()
           # Convert to milliseconds
           milliseconds_local = int(seconds_local * 1000)
@@ -140,15 +118,36 @@ async def storeData(
           # Query Masukin Ke DetailTrans
           details = data.get('detail_trans', [])
           for item in details:
-            q2 = """
-              INSERT INTO detail_transaksi(
-                id_detail_transaksi, id_fnb, qty, satuan, harga_item, harga_total
-              ) 
-              VALUES(
-                %s, %s, %s, %s, %s, %s
+            if item['satuan'].lower() == "pcs":
+              q2 = """
+                INSERT INTO detail_transaksi_produk(
+                  id_detail_transaksi, id_produk, qty, satuan, durasi_awal, 
+                  total_durasi, harga_item, harga_total, status, is_addon
+                ) 
+                VALUES(
+                  %s, %s, %s, %s, %s, 
+                  %s, %s, %s, %s, %s
+                )
+              """
+              await cursor.execute(q2, 
+                (new_id_dt, item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
+                 item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], item['status'], item['is_addon'])
               )
-            """
-            await cursor.execute(q2, (new_id_dt, item['id_fnb'], item['jlh'], item['satuan'], item['harga_fnb'], item['harga_total']))
+            else:
+              q2 = """
+                INSERT INTO detail_transaksi_paket(
+                  id_detail_transaksi, id_paket, qty, satuan, durasi_awal, 
+                  total_durasi, harga_item, harga_total, status, is_addon
+                ) 
+                VALUES(
+                  %s, %s, %s, %s, %s, 
+                  %s, %s, %s, %s, %s
+                )
+              """
+              await cursor.execute(q2, (
+                new_id_dt, item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
+                item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], item['status'], item['is_addon']
+              ))
 
           #Query Masukin ke Transaksi
           if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
@@ -161,7 +160,7 @@ async def storeData(
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
-              2, 'fnb', new_id_dt, data['total_harga'], data['disc'], 
+              2, 'massage', new_id_dt, data['total_harga'], data['disc'], 
               data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
               data['nama_bank'], data['jumlah_bayar'], 0, 'stored',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -177,35 +176,35 @@ async def storeData(
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
-              2, 'fnb', new_id_dt, data['total_harga'], data['disc'], 
+              2, 'massage', new_id_dt, data['total_harga'], data['disc'], 
               data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
               data['jumlah_bayar'] - data['grand_total'], 'stored',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 
           # Masukin ke tabel kitchen juga
-          q4 = """
-            INSERT INTO kitchen(
-              id_transaksi, status_pesanan
-            ) 
-            VALUES(
-              %s, %s
-            )
-          """
-          await cursor.execute(q4, (data['id_transaksi'], 'pending'))
+          # q4 = """
+          #   INSERT INTO kitchen(
+          #     id_transaksi, status_pesanan
+          #   ) 
+          #   VALUES(
+          #     %s, %s
+          #   )
+          # """
+          # await cursor.execute(q4, (data['id_transaksi'], 'pending'))
         
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
           # Ini utk aktifkan websocket kirim ke admin
-          for ws_con in kitchen_connection:
-            await ws_con.send_text(
-              json.dumps({
-                "id_transaksi": data['id_transaksi'],
-                "status": "PENDING",
-                "message": "Ada Order Baru"
-              })
-            )
+          # for ws_con in kitchen_connection:
+          #   await ws_con.send_text(
+          #     json.dumps({
+          #       "id_transaksi": data['id_transaksi'],
+          #       "status": "PENDING",
+          #       "message": "Ada Order Baru"
+          #     })
+          #   )
 
 
           return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)

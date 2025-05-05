@@ -83,7 +83,9 @@ async def login(
           data = await request.json()
           passwd = data['passwd']
 
-          # Query Login
+          # Query Login. Tambah Isolation Level
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
           query = """
             SELECT u.*, k.nama_karyawan, k.jabatan FROM users u 
             LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
