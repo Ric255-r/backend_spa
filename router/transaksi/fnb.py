@@ -163,7 +163,7 @@ async def storeData(
             await cursor.execute(q3, (
               2, 'fnb', new_id_dt, data['total_harga'], data['disc'], 
               data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
-              data['nama_bank'], data['jumlah_bayar'], 0, 'stored',
+              data['nama_bank'], data['jumlah_bayar'], 0, 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
           else:
@@ -179,7 +179,7 @@ async def storeData(
             await cursor.execute(q3, (
               2, 'fnb', new_id_dt, data['total_harga'], data['disc'], 
               data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
-              data['jumlah_bayar'] - data['grand_total'], 'stored',
+              data['jumlah_bayar'] - data['grand_total'], 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 

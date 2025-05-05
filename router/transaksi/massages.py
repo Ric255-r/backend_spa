@@ -87,7 +87,24 @@ async def storeData(
           # 1. Start Transaction
           await conn.begin()
 
-          # 2. Generate a new id_kategori *inside transaction safely*
+          data = await request.json()
+          # data main transaksi
+          jenis_pembayaran = data['jenis_pembayaran']
+          status_trans = data['status']
+
+          q1 = """
+            SELECT id_ruangan, id_terapis FROM main_transaksi
+            WHERE id_transaksi = %s
+          """
+          await cursor.execute(q1, (data['id_transaksi'], ))
+
+          # Pake await fetchone, krn hanya mw ambil 1 baris data.
+          # rSelect = result select
+          rSelect = await cursor.fetchone()
+          id_ruangan = rSelect[0]
+          id_terapis = rSelect[1]
+
+          # Ak Komen, Ga bs d pake klo sistem datatransaksinya pisah
           # q1 = """
           #   SELECT id_detail_transaksi FROM detail_transaksi WHERE id_detail_transaksi LIKE 'DT%' 
           #   ORDER BY id_detail_transaksi DESC LIMIT 1 FOR UPDATE
@@ -102,19 +119,14 @@ async def storeData(
           #     getNum = id_dt[2:]  # Remove 'DT' and get number
           #     num = int(getNum) + 1
 
-          # Karena tabel detail terpisah pisah, ga mungkin query diatas bs jalan. sehingga alternativeny get time now milisecond aj
+          # Karena tabel detail terpisah pisah, ga mungkin query diatas bs jalan. 
+          # sehingga alternativeny get time now milisecond aj
           # Get current time in seconds since epoch (local time)
           seconds_local = time.time()
           # Convert to milliseconds
           milliseconds_local = int(seconds_local * 1000)
           # awalnya diambil dari variabel num
           new_id_dt = "DT" + str(milliseconds_local).zfill(16)
-
-          # 3. Execute query 
-          data = await request.json()
-          # data main transaksi
-          jenis_pembayaran = data['jenis_pembayaran']
-          status_trans = data['status']
 
           # Pecah kedalam bentuk list, krna detail_trans bentuk array
           # Query Masukin Ke DetailTrans
@@ -169,6 +181,7 @@ async def storeData(
                 data['nama_bank'], data['jumlah_bayar'], 0, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
               ))
+            # Metode Bayar Cash
             else:
               q3 = """
                 UPDATE main_transaksi
@@ -184,6 +197,8 @@ async def storeData(
                 data['jumlah_bayar'] - data['grand_total'], jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
               ))
+          
+          # else ini unpaid = akhir.
           else:
             q3 = """
               UPDATE main_transaksi
@@ -199,19 +214,20 @@ async def storeData(
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 
+          # Bikin ruangan dan terapis sedang dipake
+          q4 = """
+            UPDATE ruangan SET status = 'occupied'
+            WHERE id_ruangan = %s
+          """
+          await cursor.execute(q4, (id_ruangan, ))
 
-          # Masukin ke tabel kitchen juga
-          # q4 = """
-          #   INSERT INTO kitchen(
-          #     id_transaksi, status_pesanan
-          #   ) 
-          #   VALUES(
-          #     %s, %s
-          #   )
-          # """
-          # await cursor.execute(q4, (data['id_transaksi'], 'pending'))
+          q5 = """
+            UPDATE karyawan SET is_occupied = %s
+            WHERE id_karyawan = %s
+          """
+          await cursor.execute(q5, (1, id_terapis))
         
-          # 3. Klo Sukses, dia bkl save ke db
+          # Klo Sukses, dia bkl save ke db
           await conn.commit()
 
           # Ini utk aktifkan websocket kirim ke admin
