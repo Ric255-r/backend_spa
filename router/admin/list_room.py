@@ -37,3 +37,88 @@ async def getDataRoom():
 
   except Exception as e:
     return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
+  
+
+@app.put('/update_room/{id_ruangan}')
+async def putRuangan(
+  id_ruangan: int,
+  request: Request
+):
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # 1. Start Transaction
+          await conn.begin()
+
+          # 2. Execute querynya
+          data = await request.json()
+          await cursor.execute("SELECT * FROM ruangan WHERE id_ruangan = %s", (id_ruangan,))
+          exists = await cursor.fetchone()
+
+          if not exists:
+              await conn.rollback()
+              return JSONResponse(content={"status": "Error", "message": "Id Ruangan not found"}, status_code=404)
+          
+          q1 = "UPDATE ruangan SET nama_ruangan = %s, lantai = %s, jenis_ruangan = %s WHERE id_ruangan = %s"
+          await cursor.execute(q1, (data['nama_ruangan'], data['lantai'], data['jenis_ruangan'], id_ruangan)) 
+          # 3. Klo Sukses, dia bkl save ke db
+          await conn.commit()
+
+          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diupdate"}, status_code=200)
+        except aiomysqlerror as e:
+          # Rollback Input Jika Error
+
+          # Ambil Error code
+          error_code = e.args[0] if e.args else "Unknown"
+          
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+        
+        except Exception as e:
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+@app.delete('/delete_room/{id_ruangan}')
+async def deleteRoom(
+  id_ruangan: int,
+  request: Request
+):
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # 1. Start Transaction
+          await conn.begin()
+
+          # 2. Execute querynya
+          data = await request.json()
+          
+          q1 = "DELETE FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(q1, (id_ruangan)) 
+          # 3. Klo Sukses, dia bkl save ke db
+          await conn.commit()
+
+          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Dihapus"}, status_code=200)
+        except aiomysqlerror as e:
+          # Rollback Input Jika Error
+
+          # Ambil Error code
+          error_code = e.args[0] if e.args else "Unknown"
+          
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+        
+        except Exception as e:
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)

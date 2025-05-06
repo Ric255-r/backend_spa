@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Optional
 import uuid
 from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
@@ -11,7 +12,7 @@ from fastapi_jwt import (
 )
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
-from jwt_auth import access_security, refresh_security, verify_jwt
+from jwt_auth import access_security, refresh_security
 
 # Untuk Routingnya jadi http://192.xx.xx.xx:5500/api/fnb/endpointfunction
 app = APIRouter(
@@ -71,115 +72,7 @@ async def kitchen_ws(
   except WebSocketDisconnect :
     kitchen_connection.remove(websocket)
   
-# Ini Di Page transaksi_food.dart
-@app.post("/createDraft")
-async def create_draft_transaksi(
-  user: JwtAuthorizationCredentials = Security(access_security)
-):
-  try:
-    pool = await get_db()
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        try:
-          await conn.begin()
 
-          q1 = """
-            SELECT id_transaksi 
-            FROM main_transaksi 
-            WHERE id_transaksi LIKE 'TF%' 
-            ORDER BY CAST(SUBSTRING(id_transaksi, 3) AS UNSIGNED) DESC
-            LIMIT 1
-            FOR UPDATE
-          """
-          await cursor.execute(q1)
-          items = await cursor.fetchone()
-          last_id = items[0] if items else None
-
-          if last_id:
-            getNum = last_id[2:]
-            new_num = int(getNum) + 1
-          else:
-            new_num = 1
-
-          new_id = "TF" + str(new_num).zfill(4)
-
-          # Insert DRAFT entry
-          q2 = """
-            INSERT INTO main_transaksi (id_transaksi, id_resepsionis, status)
-            VALUES (%s, %s, %s)
-          """
-          await cursor.execute(q2, (new_id, user['id_karyawan'], 'draft'))
-          
-          await conn.commit()
-
-          return JSONResponse(content={"id_transaksi": new_id}, status_code=200)
-        except Exception as e:
-          await conn.rollback()
-          return JSONResponse(content={"Error Db": str(e)}, status_code=500)
-
-
-  except Exception as e:
-
-    return JSONResponse(content={"error": str(e)}, status_code=500)
-  
-@app.delete('/deleteDraftId/{id}')
-async def deleteDraftId(
-  id: str
-) :
-  try:
-    pool = await get_db()
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        try:
-          await conn.begin()
-
-          q1 = """
-            DELETE FROM main_transaksi WHERE id_transaksi = %s AND status = %s
-          """
-          await cursor.execute(q1, (id, 'draft'))
-          await conn.commit()
-
-          return JSONResponse(content={"Success": "Delete Draft" }, status_code=200)
-        except Exception as e:
-          await conn.rollback()
-          return JSONResponse(content={"Error Db": str(e)}, status_code=500)
-
-
-  except Exception as e:
-
-    return JSONResponse(content={"error": str(e)}, status_code=500)
-
-
-@app.put('/updateDraft/{id}')
-async def updateDataDraft(
-  id: str,
-  request: Request
-) :
-  try:
-    pool = await get_db()
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        try:
-          await conn.begin()
-
-          data = await request.json()
-
-          q1 = """
-            UPDATE main_transaksi SET jenis_tamu = %s, no_hp = %s, nama_tamu = %s WHERE id_transaksi = %s AND status = 'draft'
-          """
-          await cursor.execute(q1, (data['jenis_tamu'], data['no_hp'], data['nama_tamu'], id))
-          await conn.commit()
-
-          return JSONResponse(content={"Success": "Update Draft" }, status_code=200)
-        except Exception as e:
-          await conn.rollback()
-          return JSONResponse(content={"Error Db": str(e)}, status_code=500)
-
-
-  except Exception as e:
-
-    return JSONResponse(content={"error": str(e)}, status_code=500)
-# End Transaksi_food.dart
 
 @app.get('/menu')
 async def getMenu():
@@ -217,21 +110,28 @@ async def storeData(
           await conn.begin()
 
           # 2. Generate a new id_kategori *inside transaction safely*
-          q1 = """
-            SELECT id_detail_transaksi FROM detail_transaksi WHERE id_detail_transaksi LIKE 'DT%' 
-            ORDER BY id_detail_transaksi DESC LIMIT 1 FOR UPDATE
-          """
-          await cursor.execute(q1)
-          items = await cursor.fetchone()
-          id_dt = items[0] if items else None
+          # q1 = """
+          #   SELECT id_detail_transaksi FROM detail_transaksi WHERE id_detail_transaksi LIKE 'DT%' 
+          #   ORDER BY id_detail_transaksi DESC LIMIT 1 FOR UPDATE
+          # """
+          # await cursor.execute(q1)
+          # items = await cursor.fetchone()
+          # id_dt = items[0] if items else None
 
-          if id_dt is None:
-              num = 1  # First entry
-          else:
-              getNum = id_dt[2:]  # Remove 'DT' and get number
-              num = int(getNum) + 1
+          # if id_dt is None:
+          #     num = 1  # First entry
+          # else:
+          #     getNum = id_dt[2:]  # Remove 'DT' and get number
+          #     num = int(getNum) + 1
 
-          new_id_dt = "DT" + str(num).zfill(4)
+          # new_id_dt = "DT" + str(num).zfill(4)
+
+          # Samain dengan kode detailtransaksi massage
+          seconds_local = time.time()
+          # Convert to milliseconds
+          milliseconds_local = int(seconds_local * 1000)
+          # awalnya diambil dari variabel num
+          new_id_dt = "DT" + str(milliseconds_local).zfill(16)
 
           # 3. Execute query DT
           data = await request.json()
@@ -263,7 +163,7 @@ async def storeData(
             await cursor.execute(q3, (
               2, 'fnb', new_id_dt, data['total_harga'], data['disc'], 
               data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
-              data['nama_bank'], data['jumlah_bayar'], 0, 'stored',
+              data['nama_bank'], data['jumlah_bayar'], 0, 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
           else:
@@ -279,7 +179,7 @@ async def storeData(
             await cursor.execute(q3, (
               2, 'fnb', new_id_dt, data['total_harga'], data['disc'], 
               data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
-              data['jumlah_bayar'] - data['grand_total'], 'stored',
+              data['jumlah_bayar'] - data['grand_total'], 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 

@@ -25,7 +25,10 @@ async def fnUser(
       async with conn.cursor() as cursor:
         try:
           query = """
-            SELECT u.*, k.nama_karyawan, k.jabatan FROM users u 
+            SELECT u.id_karyawan, u.passwd, h.nama_hakakses AS hak_akses, 
+            k.nama_karyawan, k.jabatan 
+            FROM users u 
+            INNER JOIN hak_akses h ON u.hak_akses = h.id
             LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
             WHERE u.id_karyawan = %s
           """
@@ -45,8 +48,8 @@ async def fnUser(
 
           if not records:
             return JSONResponse(
-                content={"status": "error", "message": "Data tidak ditemukan"},
-                status_code=404
+              content={"status": "error", "message": "Data tidak ditemukan"},
+              status_code=404
             )
 
           subject = records[0]
@@ -83,9 +86,14 @@ async def login(
           data = await request.json()
           passwd = data['passwd']
 
-          # Query Login
+          # Query Login. Tambah Isolation Level
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
           query = """
-            SELECT u.*, k.nama_karyawan, k.jabatan FROM users u 
+            SELECT u.id_karyawan, u.passwd, h.nama_hakakses AS hak_akses, 
+            k.nama_karyawan, k.jabatan 
+            FROM users u 
+            INNER JOIN hak_akses h ON u.hak_akses = h.id
             LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
             WHERE u.id_karyawan = %s
           """ 
@@ -158,5 +166,74 @@ async def login(
         except aiomysqlerror as e:
           return JSONResponse(content={"status": "error", "message": f"Database Error {str(e)}"}, status_code=500)
         
+  except Exception as e:
+    return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+@app.get('/hak_akses')
+async def hak_akses(
+  user: JwtAuthorizationCredentials = Security(access_security)
+):
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # Query Hak Akses 1 (Utama)
+          q1 = """
+            SELECT u.*, h.nama_hakakses FROM users u 
+            INNER JOIN hak_akses h ON u.hak_akses = h.id
+            WHERE u.id_karyawan = %s
+          """
+          await cursor.execute(q1, (user['id_karyawan'], ))
+
+          column_name = []
+          for kol in cursor.description:
+            column_name.append(kol[0])
+          
+          items = await cursor.fetchall()
+
+          #Buat bentuk df
+          df = pd.DataFrame(items, columns=column_name)
+
+          # Jadikan json
+          records = df.to_dict('records')
+          subject = records[0]
+          # Pop password
+          subject.pop('passwd', None)
+
+          if not records:
+            return JSONResponse(
+              content={"status": "error", "message": "Data tidak ditemukan"},
+              status_code=404
+            )
+          # End Query 1
+
+          # Query Hak Akses Tambahan
+          q2 = """
+            SELECT kht.*, h.nama_hakakses FROM karyawan_hakakses_tambahan kht 
+            INNER JOIN hak_akses h ON kht.id_hak_akses = h.id 
+            LEFT JOIN users u ON kht.id_karyawan = u.id_karyawan 
+            WHERE kht.id_karyawan = %s;
+          """
+          await cursor.execute(q2, (user['id_karyawan'], ))
+
+          column_name = []
+          for kol in cursor.description:
+            column_name.append(kol[0])
+          
+          items = await cursor.fetchall()
+
+          #Buat bentuk df
+          df2 = pd.DataFrame(items, columns=column_name)
+          records2 = df2.to_dict('records')
+          # masukin hasil records 2 ke records 1
+          subject['second_hakakses'] = records2
+          # End Query Hak Akses Tambahan
+
+          return subject
+        except aiomysqlerror as e:
+          return JSONResponse(content={"status": "error", "message": f"Database Error {str(e)}"}, status_code=500)
+  
   except Exception as e:
     return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)

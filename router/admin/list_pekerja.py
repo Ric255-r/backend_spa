@@ -37,6 +37,55 @@ async def getDataPekerja():
 
   except Exception as e:
     return JSONResponse({"Error Get Data Karyawan": str(e)}, status_code=500)
+  
+# Ini Utk transaksi
+@app.get('/dataterapis')
+async def getDataTerapis():
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        q1 = "SELECT * FROM karyawan WHERE jabatan = %s or id_karyawan LIKE %s"
+        await cursor.execute(q1, ("terapis", "T%"))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data Terapis": str(e)}, status_code=500)
+  
+@app.get('/datagro')
+async def getDataGro():
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        q1 = "SELECT * FROM karyawan WHERE jabatan = %s or id_karyawan LIKE %s"
+        await cursor.execute(q1, ("gro", "G%"))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data GRO": str(e)}, status_code=500)
+
+# End Utk Transaksi
 
 @app.put('/update_pekerja/{id_karyawan}')
 async def putPekerja(
@@ -61,8 +110,8 @@ async def putPekerja(
           #     await conn.rollback()
           #     return JSONResponse(content={"status": "Error", "message": "Karyawan not found"}, status_code=404)
           
-          q1 = "UPDATE karyawan SET nik = %s, nama_karyawan = %s, alamat = %s, umur = %s, jk = %s, no_hp = %s WHERE id_karyawan = %s"
-          await cursor.execute(q1, (data['nik'], data['nama_karyawan'], data['alamat'], data['umur'], data['jk'], data['no_hp'], id_karyawan)) 
+          q1 = "UPDATE karyawan SET nik = %s, nama_karyawan = %s, alamat = %s, jk = %s, no_hp = %s, status = %s WHERE id_karyawan = %s"
+          await cursor.execute(q1, (data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['status'], id_karyawan)) 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
