@@ -1,6 +1,6 @@
 from typing import Optional
 import uuid
-from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
 from fastapi_jwt import (
@@ -13,8 +13,39 @@ from aiomysql import Error as aiomysqlerror
 
 # Untuk Routingnya jadi http://192.xx.xx.xx:5500/api/produk/endpointfunction
 app = APIRouter(
-  prefix="/users",
+  prefix="/form_user",
 )
+
+@app.get('/hak_akses')
+async def getHakAkses(
+  id: Optional[int] = Query(None),
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        if id is None:
+          q1 = "SELECT id, nama_hakakses FROM hak_akses"
+          await cursor.execute(q1)
+        else:
+          q1 = "SELECT id, nama_hakakses FROM hak_akses WHERE id != %s"
+          await cursor.execute(q1, (id, ))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Tabel Hak Akses": str(e)}, status_code=500)
+  
 
 @app.get('/kode')
 async def getKodeKaryawan():
@@ -54,8 +85,15 @@ async def postUsers(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO users (id_karyawan, passwd, hak_akses) VALUES(%s, %s, %s)"
+
+          q1 = "INSERT INTO users(id_karyawan, passwd, hak_akses) VALUES(%s, %s, %s)"
           await cursor.execute(q1, (data['id_karyawan'], data['passwd'], data['hak_akses'])) 
+
+          hak_akses_tambahan = data.get('hak_akses_tambahan', [])
+          for item in hak_akses_tambahan:
+            q2 = "INSERT INTO karyawan_hakakses_tambahan(id_karyawan, id_hak_akses) VALUES(%s, %s)"
+            await cursor.execute(q2, (data['id_karyawan'], item)) 
+
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
