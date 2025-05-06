@@ -119,7 +119,7 @@ async def login(
           subject.pop('created_at', None)
           subject.pop('updated_at', None)
 
-          if subject['hak_akses'] == "ruangan":
+          if subject['hak_akses'] == "Ruangan":
             query2 = """
               SELECT * FROM ruangan WHERE id_karyawan = %s LIMIT 1
             """ 
@@ -131,7 +131,7 @@ async def login(
 
             # Masukin Data dari tabel ruangan utk login
             subject['id_ruangan'] = items2[0]
-            subject['id_akun_ruangan'] = items2[1]
+            subject['id_karyawan'] = items2[1]
             subject['nama_ruangan'] = items2[2]
             subject['lantai'] = items2[3]
             subject['jenis_ruangan'] = items2[4]

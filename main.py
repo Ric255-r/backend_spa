@@ -24,9 +24,8 @@ from router.admin.listproduk import app as app_listproduk
 from router.admin.listfasilitas import app as app_listfasilitas
 from router.admin.selectsearch import app as app_selectsearch
 # from router.transaksi.kitchen import app as app_kitchen
-# from router.ob.start_kerja import app as app_ob
 from router.transaksi.kitchen import app as app_kitchen
-from router.ob.start_kerja import app as app_ob
+# from router.ob.start_kerja import app as app_ob
 from router.terapis.kamar_terapis import app as app_kamarterapis
 from router.admin.list_user import app as app_datauser
 from jwt_auth import access_security
@@ -65,7 +64,7 @@ main_router.include_router(app_laporanob)
 # main_router.include_router(app_kitchen)
 # main_router.include_router(app_ob)
 main_router.include_router(app_kitchen)
-main_router.include_router(app_ob)
+# main_router.include_router(app_ob)
 main_router.include_router(app_kamarterapis)
 main_router.include_router(app_datauser)
 main_router.include_router(app_listproduk)
@@ -84,4 +83,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="192.168.1.39", port=5500)
+  uvicorn.run(app, host="192.168.1.9", port=5500)
