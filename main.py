@@ -23,11 +23,10 @@ from router.transaksi.kitchen import app as app_kitchen
 from router.admin.listproduk import app as app_listproduk
 from router.admin.listfasilitas import app as app_listfasilitas
 from router.admin.selectsearch import app as app_selectsearch
-# from router.transaksi.kitchen import app as app_kitchen
-from router.transaksi.kitchen import app as app_kitchen
-# from router.ob.start_kerja import app as app_ob
 from router.terapis.kamar_terapis import app as app_kamarterapis
 from router.admin.list_user import app as app_datauser
+from router.transaksi.massages import app as app_transaksimassage
+from router.transaksi.draft_idtrans import app as app_idtrans
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -61,13 +60,13 @@ main_router.include_router(app_daftarpromo)
 main_router.include_router(app_listpaketmassage)
 main_router.include_router(app_listfnb)
 main_router.include_router(app_laporanob)
-# main_router.include_router(app_kitchen)
-# main_router.include_router(app_ob)
 main_router.include_router(app_kitchen)
 # main_router.include_router(app_ob)
 main_router.include_router(app_kamarterapis)
 main_router.include_router(app_datauser)
 main_router.include_router(app_listproduk)
+main_router.include_router(app_transaksimassage)
+main_router.include_router(app_idtrans)
 main_router.include_router(app_listfasilitas)
 main_router.include_router(app_selectsearch)
 # main_router.include_router(app_fnb)

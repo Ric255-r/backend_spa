@@ -37,6 +37,55 @@ async def getDataPekerja():
 
   except Exception as e:
     return JSONResponse({"Error Get Data Karyawan": str(e)}, status_code=500)
+  
+# Ini Utk transaksi
+@app.get('/dataterapis')
+async def getDataTerapis():
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        q1 = "SELECT * FROM karyawan WHERE jabatan = %s or id_karyawan LIKE %s"
+        await cursor.execute(q1, ("terapis", "T%"))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data Terapis": str(e)}, status_code=500)
+  
+@app.get('/datagro')
+async def getDataGro():
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        q1 = "SELECT * FROM karyawan WHERE jabatan = %s or id_karyawan LIKE %s"
+        await cursor.execute(q1, ("gro", "G%"))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data GRO": str(e)}, status_code=500)
+
+# End Utk Transaksi
 
 @app.put('/update_pekerja/{id_karyawan}')
 async def putPekerja(
