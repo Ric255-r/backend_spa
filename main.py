@@ -50,7 +50,7 @@ main_router = APIRouter()
 
 main_router.include_router(app_test)
 main_router.include_router(app_login)
-# main_router.include_router(app_fnb)
+main_router.include_router(app_fnb)
 main_router.include_router(app_room)
 main_router.include_router(app_pekerja)
 main_router.include_router(app_daftarfnb)
@@ -89,4 +89,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="192.168.100.9", port=5500)
+  uvicorn.run(app, host="192.168.1.79", port=5500)
