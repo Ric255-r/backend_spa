@@ -29,7 +29,6 @@ from router.admin.selectsearchpromo import app as app_selectsearchpromo
 from router.transaksi.kitchen import app as app_kitchen
 from router.ob.start_kerja import app as app_ob
 from router.transaksi.kitchen import app as app_kitchen
-from router.ob.start_kerja import app as app_ob
 from router.terapis.kamar_terapis import app as app_kamarterapis
 from router.admin.list_user import app as app_datauser
 from router.transaksi.massages import app as app_transaksimassage
@@ -52,7 +51,7 @@ main_router = APIRouter()
 
 main_router.include_router(app_test)
 main_router.include_router(app_login)
-# main_router.include_router(app_fnb)
+main_router.include_router(app_fnb)
 main_router.include_router(app_room)
 main_router.include_router(app_pekerja)
 main_router.include_router(app_daftarfnb)
@@ -69,7 +68,7 @@ main_router.include_router(app_listfnb)
 main_router.include_router(app_laporanob)
 main_router.include_router(app_kitchen)
 main_router.include_router(app_listtransaksi)
-# main_router.include_router(app_ob)
+main_router.include_router(app_ob)
 main_router.include_router(app_kamarterapis)
 main_router.include_router(app_datauser)
 main_router.include_router(app_listproduk)
