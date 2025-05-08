@@ -31,8 +31,10 @@ async def postRoom(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO ruangan (nama_ruangan, lantai, jenis_ruangan, status) VALUES(%s, %s, %s, %s)"
-          await cursor.execute(q1, (data['nama_ruangan'], data['lantai'], data['jenis_ruangan'], data['status'])) 
+          q1 = "INSERT INTO ruangan (nama_ruangan, id_karyawan, lantai, jenis_ruangan, status) VALUES(%s, %s, %s, %s, %s)"
+          await cursor.execute(q1, (data['nama_ruangan'], data['kode_ruangan'],data['lantai'], data['jenis_ruangan'], data['status'])) 
+          q2 = "INSERT INTO users (id_karyawan, passwd, hak_akses) VALUES(%s, %s, %s)"
+          await cursor.execute(q2, (data['kode_ruangan'], data['passwd'], data['hak_akses']))
 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
@@ -80,3 +82,36 @@ async def check_room_name(nama_ruangan: str):
     except Exception as e:
         print(f"Error in /check_room endpoint: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
+    
+@app.get('/idroom')
+async def getIdRoom():
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        q1 = """
+             SELECT MAX(CAST(SUBSTRING(id_karyawan, 3) AS UNSIGNED)) 
+                FROM ruangan 
+                WHERE id_karyawan LIKE 'KT%'
+             """
+
+        await cursor.execute(q1)
+        last_id = (await cursor.fetchone())[0] or 0
+
+        next_id = last_id + 1
+
+        formatted_id = f"KT{next_id:03d}"
+        # items = await cursor.fetchall()
+        return formatted_id
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data ID Room": str(e)}, status_code=500)
+  
+  # column_name = []
+  #       for kol in cursor.description:
+  #         column_name.append(kol[0])
+
+  #       df = pd.DataFrame(items, columns=column_name)
+  #       return df.to_dict('records')
