@@ -23,7 +23,7 @@ async def getDataTrans():
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
-        q1 = "SELECT * FROM main_transaksi ORDER BY id_transaksi ASC"
+        q1 = "SELECT mt.*, COALESCE(r.nama_ruangan, '-') AS nama_ruangan FROM main_transaksi mt LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan ORDER BY mt.id_transaksi ASC"
         await cursor.execute(q1)
 
         items = await cursor.fetchall()
