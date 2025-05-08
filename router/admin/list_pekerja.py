@@ -151,6 +151,8 @@ async def deletePekerja(
           
           q1 = "DELETE FROM karyawan WHERE id_karyawan = %s"
           await cursor.execute(q1, (id_karyawan)) 
+          q2 = "DELETE FROM users WHERE id_karyawan = %s"
+          await cursor.execute(q2, (id_karyawan))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 

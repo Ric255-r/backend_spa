@@ -12,7 +12,7 @@ from fastapi_jwt import (
 )
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
-from jwt_auth import access_security, refresh_security, verify_jwt
+from jwt_auth import access_security, refresh_security
 import calendar
 import time
 
