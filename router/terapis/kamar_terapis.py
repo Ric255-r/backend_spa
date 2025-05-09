@@ -16,6 +16,57 @@ app = APIRouter(
   prefix="/kamar_terapis"
 )
 
+# Bagian OB
+@app.get('/data_ob')
+async def getData():
+  try: 
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # Query 
+          query = """
+            SELECT u.*, h.nama_hakakses, k.nama_karyawan FROM users u 
+            INNER JOIN hak_akses h ON u.hak_akses = h.id
+            LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
+            WHERE u.hak_akses = %s
+          """ 
+          await cursor.execute(query, ('9', ))
+
+          column_names = []
+          for kol in cursor.description:
+            column_names.append(kol[0])
+
+          # Pake await fetchone, krn hanya mw ambil 1 baris data. klo mw baanyak make fetchall
+          items = await cursor.fetchall()
+
+          # Jika ga ad data
+          if not items:
+            raise HTTPException(status_code=404, detail="User Not Found")
+          
+          # Buat Dataframe utk dapatin data dalam bentuk map/json
+          # kalo items hanya return single row, lapis make [] krn pake fetchone, klo fetchall g ush lapis.
+          df = pd.DataFrame(items, columns=column_names)
+
+          # utk return data. ambil index ke-0 krn dia return dalam bentuk list/array
+          subject = df.to_dict('records')
+          for item in subject:
+            item.pop('passwd', None)
+
+          return subject
+
+        except HTTPException as e:
+          return JSONResponse(content={"Status": f"Error {str(e)}"}, status_code=e.status_code)
+
+        except aiomysqlerror as e:
+          return JSONResponse(content={"status": "error", "message": f"Database Error {str(e)}"}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+
+
 @app.post('/verif')
 async def verif(
   request: Request
@@ -27,7 +78,6 @@ async def verif(
       async with conn.cursor() as cursor:
         try:
           data = await request.json()
-          passwd = data['passwd']
 
           # Query Login
           query = """
@@ -49,12 +99,7 @@ async def verif(
             raise HTTPException(status_code=404, detail="User Not Found")
           
           # berdasarkan db, attr passwd di index ke-1
-          stored_pass = items[1]
 
-          if passwd != stored_pass:
-            raise HTTPException(status_code=401, detail="Password Salah")
-          
-          # Buat Dataframe utk dapatin data dalam bentuk map/json
           # kalo items hanya return single row, lapis make [] krn pake fetchone, klo fetchall g ush lapis.
           df = pd.DataFrame([items], columns=column_names)
 
@@ -77,4 +122,6 @@ async def verif(
         
   except Exception as e:
     return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+# End Bagian OB
   

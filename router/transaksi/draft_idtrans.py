@@ -115,12 +115,12 @@ async def updateDataDraft(
           
           if "mode" in data and data['mode'] == "for_massage":
             q1 = """
-              UPDATE main_transaksi SET id_loker = %s, jenis_tamu = %s, no_hp = %s, nama_tamu = %s,
+              UPDATE main_transaksi SET no_loker = %s, jenis_tamu = %s, no_hp = %s, nama_tamu = %s,
               id_ruangan = %s, id_terapis = %s, id_gro = %s
               WHERE id_transaksi = %s AND status = 'draft'
             """
             await cursor.execute(q1, (
-              data['id_loker'],data['jenis_tamu'], data['no_hp'], data['nama_tamu'],
+              data['no_loker'],data['jenis_tamu'], data['no_hp'], data['nama_tamu'],
               data['id_ruangan'], data['id_terapis'], data['id_gro'], id
             ))
           else:

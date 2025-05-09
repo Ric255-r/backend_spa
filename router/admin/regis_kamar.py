@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 import uuid
 from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile
@@ -34,10 +35,11 @@ async def postRoom(
           q1 = "INSERT INTO ruangan (nama_ruangan, id_karyawan, lantai, jenis_ruangan, status) VALUES(%s, %s, %s, %s, %s)"
           await cursor.execute(q1, (data['nama_ruangan'], data['kode_ruangan'],data['lantai'], data['jenis_ruangan'], data['status'])) 
           q2 = "INSERT INTO users (id_karyawan, passwd, hak_akses) VALUES(%s, %s, %s)"
-          await cursor.execute(q2, (data['kode_ruangan'], data['passwd'], data['hak_akses']))
+          await cursor.execute(q2, (data['kode_ruangan'], data['passwd'], '7'))
 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
+          await asyncio.sleep(0.2)
 
           return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
         except aiomysqlerror as e:
