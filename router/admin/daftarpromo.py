@@ -16,6 +16,7 @@ async def getlastestiddetailpromohappyhour():
 
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
 
         q1 = "SELECT detail_kode_promo FROM detail_promo_happyhour WHERE detail_kode_promo LIKE 'DP%' ORDER BY detail_kode_promo DESC"
         cc = await cursor.execute(q1)
@@ -43,6 +44,7 @@ async def getlastestidpromo():
 
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
 
         q1 = "SELECT kode_promo FROM promo WHERE kode_promo LIKE 'P%' ORDER BY kode_promo DESC"
         await cursor.execute(q1)
@@ -74,6 +76,7 @@ async def postpromohappyhour(
 
     async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         try:
           # 1. Start Transaction
           await conn.begin()

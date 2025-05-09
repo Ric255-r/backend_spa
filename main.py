@@ -18,14 +18,15 @@ from router.admin.list_pekerja import app as app_listpekerja
 from router.admin.list_room import app as app_listroom
 from router.admin.laporan_ob import app as app_laporanob
 from router.admin.list_transaksi import app as app_listtransaksi
-# from router.transaksi.fnb import app 
 from router.admin.daftarproduk import app as app_daftarproduk
 from router.transaksi.kitchen import app as app_kitchen
 from router.admin.listproduk import app as app_listproduk
 from router.admin.listfasilitas import app as app_listfasilitas
 from router.admin.selectsearchfood import app as app_selectsearchfood
 from router.admin.listpromo import app as app_listpromo
+from router.admin.daftarlocker import app as app_daftarlocker
 from router.admin.selectsearchpromo import app as app_selectsearchpromo
+from router.terapis.billinglocker import app as app_billinglocker
 from router.transaksi.kitchen import app as app_kitchen
 from router.ob.start_kerja import app as app_ob
 from router.transaksi.kitchen import app as app_kitchen
@@ -78,7 +79,8 @@ main_router.include_router(app_listfasilitas)
 main_router.include_router(app_selectsearchfood)
 main_router.include_router(app_listpromo)
 main_router.include_router(app_selectsearchpromo)
-# main_router.include_router(app_fnb)
+main_router.include_router(app_daftarlocker)
+main_router.include_router(app_billinglocker)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
 
@@ -91,4 +93,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="192.168.1.79", port=5500)
+  uvicorn.run(app, host="192.168.1.17", port=5500)
