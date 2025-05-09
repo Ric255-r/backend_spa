@@ -48,8 +48,8 @@ async def updatelocker(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "UPDATE data_loker SET status = %s WHERE id_loker= %s"
-          await cursor.execute(q1, (data['status'],data['id_loker']))
+          q1 = "UPDATE data_loker SET status = %s WHERE nomor_locker= %s"
+          await cursor.execute(q1, (data['status'],data['nomor_locker']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
