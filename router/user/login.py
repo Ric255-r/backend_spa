@@ -57,6 +57,7 @@ async def fnUser(
           # Jika hak akses user adalah ruangan. tambahkan keyvalue lagi
           if user['hak_akses'] == "ruangan":
             subject['id_ruangan'] = user['id_ruangan']
+            # sesuaikan dengan /login, 
             subject['id_akun_ruangan'] = user['id_akun_ruangan']
             subject['nama_ruangan'] = user['nama_ruangan']
             subject['lantai'] = user['lantai']
@@ -87,7 +88,15 @@ async def login(
           passwd = data['passwd']
 
           # Query Login. Tambah Isolation Level
+          await cursor.execute("SET autocommit = 1;")
           await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+          """
+            If you're still having issues, you can close and reopen the cursor before your SELECT query 
+            (this forces MySQL to discard old session state):
+            await cursor.close()
+            cursor = await conn.cursor()
+          """
 
           query = """
             SELECT u.id_karyawan, u.passwd, h.nama_hakakses AS hak_akses, 
@@ -127,7 +136,7 @@ async def login(
           subject.pop('created_at', None)
           subject.pop('updated_at', None)
 
-          if subject['hak_akses'] == "Ruangan":
+          if subject['hak_akses'].lower() == "ruangan":
             query2 = """
               SELECT * FROM ruangan WHERE id_karyawan = %s LIMIT 1
             """ 
@@ -139,7 +148,7 @@ async def login(
 
             # Masukin Data dari tabel ruangan utk login
             subject['id_ruangan'] = items2[0]
-            subject['id_karyawan'] = items2[1]
+            subject['id_akun_ruangan'] = items2[1]
             subject['nama_ruangan'] = items2[2]
             subject['lantai'] = items2[3]
             subject['jenis_ruangan'] = items2[4]
