@@ -74,9 +74,10 @@ async def getDataTrans():
 
         # Query food details
         q_food = f"""
-          SELECT dtp.*, m.nama_fnb, m.kategori
+          SELECT dtp.*, m.nama_fnb, k.nama_kategori AS kategori
           FROM detail_transaksi dtp
           LEFT JOIN menu_fnb m ON dtp.id_fnb = m.id_fnb
+          LEFT JOIN kategori_fnb k ON m.id_kategori = k.id_kategori
           WHERE dtp.id_detail_transaksi IN ({placeholders})
           ORDER BY dtp.id_detail_transaksi
         """
