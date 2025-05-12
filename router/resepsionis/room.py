@@ -7,10 +7,10 @@ import pandas as pd
 from aiomysql import Error as aiomysqlerror
 import asyncio
 
-app = APIRouter(prefix=("/billinglocker"))
+app = APIRouter(prefix=("/ruangan"))
 
-@app.get('/getdatalocker')
-async def getdatalocker() :
+@app.get('/getdataruangan')
+async def getdataruangan() :
   try :
     pool = await get_db()
 
@@ -19,7 +19,7 @@ async def getdatalocker() :
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         # await cursor.execute("COMMIT;")
 
-        q1 = "SELECT * FROM data_loker ORDER BY id_loker asc"
+        q1 = "SELECT * FROM ruangan WHERE status <> 'nonaktif' ORDER BY id_ruangan asc"
 
         await cursor.execute(q1)  
 
@@ -33,7 +33,7 @@ async def getdatalocker() :
   except HTTPException as e:
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
 
-@app.put('/updatelocker')
+@app.put('/updateruangan')
 async def updatelocker(
   request: Request
 ):
@@ -48,8 +48,8 @@ async def updatelocker(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "UPDATE data_loker SET status = %s WHERE nomor_locker= %s"
-          await cursor.execute(q1, (data['status'],data['nomor_locker']))
+          q1 = "UPDATE ruangan SET status = %s WHERE id_ruangan= %s"
+          await cursor.execute(q1, (data['status'],data['id_ruangan']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
