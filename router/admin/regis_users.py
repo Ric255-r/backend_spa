@@ -46,6 +46,62 @@ async def getHakAkses(
   except Exception as e:
     return JSONResponse({"Error Get Tabel Hak Akses": str(e)}, status_code=500)
   
+@app.get('/hakakses_current')
+async def getUserHakUtama(
+  id_karyawan: Optional[str] = Query(None),
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        q1 = """
+          SELECT u.hak_akses AS id_hakakses, h.nama_hakakses FROM users u 
+          INNER JOIN hak_akses h ON u.hak_akses = h.id
+          WHERE u.id_karyawan = %s
+        """
+        await cursor.execute(q1, (id_karyawan, ))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error getUserHakUtama": str(e)}, status_code=500)
+  
+@app.get('/hakakses_tambahan')
+async def getUserHakAkses(
+  id_karyawan: Optional[str] = Query(None),
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        q1 = "SELECT id_hak_akses FROM karyawan_hakakses_tambahan WHERE id_karyawan = %s"
+        await cursor.execute(q1, (id_karyawan, ))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error getUserHakAkses": str(e)}, status_code=500)
+  
 
 @app.get('/kode')
 async def getKodeKaryawan():

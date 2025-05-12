@@ -47,8 +47,31 @@ async def getDataTerapis():
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
-        q1 = "SELECT * FROM karyawan WHERE jabatan = %s or id_karyawan LIKE %s"
+        q1 = "SELECT * FROM karyawan WHERE (jabatan = %s or id_karyawan LIKE %s) AND status = 'Aktif'"
         await cursor.execute(q1, ("terapis", "T%"))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data Terapis": str(e)}, status_code=500)
+  
+@app.get('/dataterapisrolling')
+async def getDataTerapisRolling():
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        q1 = "SELECT k.*, a.jam_absen FROM karyawan k JOIN absensi_terapis a ON k.id_karyawan = a.id_karyawan WHERE k.jabatan = %s OR k.id_karyawan LIKE %s ORDER BY a.jam_absen ASC;"
+        await cursor.execute(q1, ("Terapis", "T%"))
 
         items = await cursor.fetchall()
 
