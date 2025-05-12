@@ -181,8 +181,8 @@ async def postTerapis(
           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
   except Exception as e:
-    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)  
-
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
 # async def getIdKaryawan():
 #   try:
 #     pool = await get_db() # Get The pool
