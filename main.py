@@ -34,16 +34,13 @@ from router.terapis.kamar_terapis import app as app_kamarterapis
 from router.admin.list_user import app as app_datauser
 from router.transaksi.massages import app as app_transaksimassage
 from router.transaksi.draft_idtrans import app as app_idtrans
-<<<<<<< HEAD
 from router.terapis.extend_time import app as app_extends
-=======
 from router.spv.terima_panggilan import app as app_terimapanggilan
 from router.resepsionis.room import app as app_ruangan
 from router.admin.absensi_terapis import app as app_absensi_terapis
 from router.transaksi.fasilitas import app as app_fasilitas
 from router.transaksi.regis_member import app as app_regis_member
 from router.admin.list_member import app as app_listmember
->>>>>>> 3fcc5e01b16971949229391caef73c2f3476da5f
 from jwt_auth import access_security
 
 from koneksi import lifespan
