@@ -34,7 +34,16 @@ from router.terapis.kamar_terapis import app as app_kamarterapis
 from router.admin.list_user import app as app_datauser
 from router.transaksi.massages import app as app_transaksimassage
 from router.transaksi.draft_idtrans import app as app_idtrans
+<<<<<<< HEAD
 from router.terapis.extend_time import app as app_extends
+=======
+from router.spv.terima_panggilan import app as app_terimapanggilan
+from router.resepsionis.room import app as app_ruangan
+from router.admin.absensi_terapis import app as app_absensi_terapis
+from router.transaksi.fasilitas import app as app_fasilitas
+from router.transaksi.regis_member import app as app_regis_member
+from router.admin.list_member import app as app_listmember
+>>>>>>> 3fcc5e01b16971949229391caef73c2f3476da5f
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -83,6 +92,12 @@ main_router.include_router(app_selectsearchpromo)
 main_router.include_router(app_daftarlocker)
 main_router.include_router(app_billinglocker)
 main_router.include_router(app_extends)
+main_router.include_router(app_terimapanggilan)
+main_router.include_router(app_ruangan )
+main_router.include_router(app_absensi_terapis)
+main_router.include_router(app_fasilitas)
+main_router.include_router(app_regis_member)
+main_router.include_router(app_listmember)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
 
@@ -95,4 +110,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="192.168.189.166", port=5500)
+  uvicorn.run(app, host="192.168.100.11", port=5500)
