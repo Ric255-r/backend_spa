@@ -109,30 +109,6 @@ async def storeData(
           # 1. Start Transaction
           await conn.begin()
 
-          # 2. Generate a new id_kategori *inside transaction safely*
-          # q1 = """
-          #   SELECT id_detail_transaksi FROM detail_transaksi WHERE id_detail_transaksi LIKE 'DT%' 
-          #   ORDER BY id_detail_transaksi DESC LIMIT 1 FOR UPDATE
-          # """
-          # await cursor.execute(q1)
-          # items = await cursor.fetchone()
-          # id_dt = items[0] if items else None
-
-          # if id_dt is None:
-          #     num = 1  # First entry
-          # else:
-          #     getNum = id_dt[2:]  # Remove 'DT' and get number
-          #     num = int(getNum) + 1
-
-          # new_id_dt = "DT" + str(num).zfill(4)
-
-          # Samain dengan kode detailtransaksi massage
-          seconds_local = time.time()
-          # Convert to milliseconds
-          milliseconds_local = int(seconds_local * 1000)
-          # awalnya diambil dari variabel num
-          new_id_dt = "DT" + str(milliseconds_local).zfill(16)
-
           # 3. Execute query DT
           data = await request.json()
 
@@ -140,28 +116,47 @@ async def storeData(
           # Query Masukin Ke DetailTrans
           details = data.get('detail_trans', [])
           for item in details:
+            # Samain dengan kode detailtransaksi massage
+            # seconds_local = time.time()
+            # # Convert to milliseconds
+            # milliseconds_local = int(seconds_local * 1000)
+            # # awalnya diambil dari variabel num
+            # new_id_dt = "DT" + str(milliseconds_local).zfill(16)
+            new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
+
             q2 = """
-              INSERT INTO detail_transaksi(
-                id_detail_transaksi, id_fnb, qty, satuan, harga_item, harga_total
+              INSERT INTO detail_transaksi_fnb(
+                id_detail_transaksi, id_transaksi, id_fnb, qty, satuan, harga_item, harga_total
               ) 
               VALUES(
-                %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s
               )
             """
-            await cursor.execute(q2, (new_id_dt, item['id_fnb'], item['jlh'], item['satuan'], item['harga_fnb'], item['harga_total']))
+            await cursor.execute(q2, (new_id_dt, data['id_transaksi'], item['id_fnb'], item['jlh'], item['satuan'], item['harga_fnb'], item['harga_total']))
+
+            # Masukin ke tabel kitchen juga
+            q4 = """
+              INSERT INTO kitchen(
+                id_transaksi, id_detail_transaksi, status_pesanan, is_addon
+              ) 
+              VALUES(
+                %s, %s, %s, %s
+              )
+            """
+            await cursor.execute(q4, (data['id_transaksi'], new_id_dt, 'pending', 0))
 
           #Query Masukin ke Transaksi
           if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
             q3 = """
               UPDATE main_transaksi
               SET
-                no_loker = %s, jenis_transaksi = %s, id_detail_transaksi = %s, total_harga = %s, disc = %s, 
+                no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
                 grand_total = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
                 nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
-              0, 'fnb', new_id_dt, data['total_harga'], data['disc'], 
+              -1, 'fnb', data['total_harga'], data['disc'], 
               data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
               data['nama_bank'], data['jumlah_bayar'], 0, 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -171,28 +166,92 @@ async def storeData(
             q3 = """
               UPDATE main_transaksi
               SET
-                no_loker = %s, jenis_transaksi = %s, id_detail_transaksi = %s, total_harga = %s, disc = %s, 
+                no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
                 grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
                 jumlah_kembalian = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
-              0, 'fnb', new_id_dt, data['total_harga'], data['disc'], 
+              -1, 'fnb', data['total_harga'], data['disc'], 
               data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
               data['jumlah_bayar'] - data['grand_total'], 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 
-          # Masukin ke tabel kitchen juga
-          q4 = """
-            INSERT INTO kitchen(
-              id_transaksi, status_pesanan
-            ) 
-            VALUES(
-              %s, %s
+          # 3. Klo Sukses, dia bkl save ke db
+          await conn.commit()
+
+          # Ini utk aktifkan websocket kirim ke admin
+          for ws_con in kitchen_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": data['id_transaksi'],
+                "status": "PENDING",
+                "message": "Ada Order Baru"
+              })
             )
-          """
-          await cursor.execute(q4, (data['id_transaksi'], 'pending'))
+
+
+          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
+        except aiomysqlerror as e:
+          # Rollback Input Jika Error
+
+          # Ambil Error code
+          error_code = e.args[0] if e.args else "Unknown"
+          
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+        
+        except Exception as e:
+          await conn.rollback()
+          print(f"Error {e}")
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+@app.post('/store_addon')
+async def storeAddOn(
+  request: Request
+):
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # 1. Start Transaction
+          await conn.begin()
+
+          # 3. Execute query DT
+          data = await request.json()
+          id_trans = data['id_transaksi']
+
+          # Pecah kedalam bentuk list, krna detail_trans bentuk array
+          # Query Masukin Ke DetailTrans
+          details = data.get('detail_trans', [])
+          for item in details:
+            new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
+            q2 = """
+              INSERT INTO detail_transaksi_fnb(
+                id_detail_transaksi, id_transaksi, id_fnb, qty, satuan, harga_item, harga_total, status, is_addon
+              ) 
+              VALUES(
+                %s, %s, %s, %s, %s, %s, %s, %s, %s
+              )
+            """
+            await cursor.execute(q2, (new_id_dt, id_trans, item['id_fnb'], item['jlh'], item['satuan'], item['harga_fnb'], item['harga_total'], 'unpaid', 1))
+
+            # Masukin ke tabel kitchen juga
+            q4 = """
+              INSERT INTO kitchen(
+                id_transaksi, id_detail_transaksi, status_pesanan, is_addon
+              ) 
+              VALUES(
+                %s, %s, %s, %s
+              )
+            """
+            await cursor.execute(q4, (id_trans, new_id_dt, 'pending', 1))
         
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
