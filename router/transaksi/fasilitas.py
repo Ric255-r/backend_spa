@@ -47,4 +47,3 @@ async def getFasilitas():
 
   except Exception as e:
     return JSONResponse({"Error Get Paket Fasilitas": str(e)}, status_code=500)
-  
