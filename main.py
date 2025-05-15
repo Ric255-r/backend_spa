@@ -34,6 +34,7 @@ from router.terapis.kamar_terapis import app as app_kamarterapis
 from router.admin.list_user import app as app_datauser
 from router.transaksi.massages import app as app_transaksimassage
 from router.transaksi.draft_idtrans import app as app_idtrans
+from router.terapis.extend_time import app as app_extends
 from router.spv.terima_panggilan import app as app_terimapanggilan
 from router.resepsionis.room import app as app_ruangan
 from router.admin.absensi_terapis import app as app_absensi_terapis
@@ -87,6 +88,7 @@ main_router.include_router(app_listpromo)
 main_router.include_router(app_selectsearchpromo)
 main_router.include_router(app_daftarlocker)
 main_router.include_router(app_billinglocker)
+main_router.include_router(app_extends)
 main_router.include_router(app_terimapanggilan)
 main_router.include_router(app_ruangan )
 main_router.include_router(app_absensi_terapis)
