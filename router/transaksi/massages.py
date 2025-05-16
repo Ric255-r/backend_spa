@@ -104,62 +104,46 @@ async def storeData(
           id_ruangan = rSelect[0]
           id_terapis = rSelect[1]
 
-          # Ak Komen, Ga bs d pake klo sistem datatransaksinya pisah
-          # q1 = """
-          #   SELECT id_detail_transaksi FROM detail_transaksi WHERE id_detail_transaksi LIKE 'DT%' 
-          #   ORDER BY id_detail_transaksi DESC LIMIT 1 FOR UPDATE
-          # """
-          # await cursor.execute(q1)
-          # items = await cursor.fetchone()
-          # id_dt = items[0] if items else None
-
-          # if id_dt is None:
-          #     num = 1  # First entry
-          # else:
-          #     getNum = id_dt[2:]  # Remove 'DT' and get number
-          #     num = int(getNum) + 1
-
-          # Karena tabel detail terpisah pisah, ga mungkin query diatas bs jalan. 
-          # sehingga alternativeny get time now milisecond aj
-          # Get current time in seconds since epoch (local time)
-          seconds_local = time.time()
-          # Convert to milliseconds
-          milliseconds_local = int(seconds_local * 1000)
-          # awalnya diambil dari variabel num
-          new_id_dt = "DT" + str(milliseconds_local).zfill(16)
-
           # Pecah kedalam bentuk list, krna detail_trans bentuk array
           # Query Masukin Ke DetailTrans
           details = data.get('detail_trans', [])
           for item in details:
+            # Get current time in seconds since epoch (local time)
+            # seconds_local = time.time()
+            # # Convert to milliseconds
+            # milliseconds_local = int(seconds_local * 1000)
+            # # awalnya diambil dari variabel num
+            # new_id_dt = "DT" + str(milliseconds_local).zfill(16)
+            new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
+
             if item['satuan'].lower() == "pcs":
               q2 = """
                 INSERT INTO detail_transaksi_produk(
-                  id_detail_transaksi, id_produk, qty, satuan, durasi_awal, 
+                  id_detail_transaksi, id_transaksi, id_produk, qty, satuan, durasi_awal, 
                   total_durasi, harga_item, harga_total, status, is_addon
                 ) 
                 VALUES(
-                  %s, %s, %s, %s, %s, 
+                  %s, %s, %s, %s, %s, %s, 
                   %s, %s, %s, %s, %s
                 )
               """
               await cursor.execute(q2, 
-                (new_id_dt, item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
+                (new_id_dt, data['id_transaksi'], item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
                  item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], status_trans, item['is_addon'])
               )
             else:
               q2 = """
                 INSERT INTO detail_transaksi_paket(
-                  id_detail_transaksi, id_paket, qty, satuan, durasi_awal, 
+                  id_detail_transaksi, id_transaksi, id_paket, qty, satuan, durasi_awal, 
                   total_durasi, harga_item, harga_total, status, is_addon
                 ) 
                 VALUES(
-                  %s, %s, %s, %s, %s, 
+                  %s, %s, %s, %s, %s, %s, 
                   %s, %s, %s, %s, %s
                 )
               """
               await cursor.execute(q2, (
-                new_id_dt, item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
+                new_id_dt, data['id_transaksi'], item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
                 item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], status_trans, item['is_addon']
               ))
 
@@ -170,13 +154,13 @@ async def storeData(
               q3 = """
                 UPDATE main_transaksi
                 SET
-                  jenis_transaksi = %s, id_detail_transaksi = %s, total_harga = %s, disc = %s, 
+                  jenis_transaksi = %s, total_harga = %s, disc = %s, 
                   grand_total = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
                   nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'massage', new_id_dt, data['total_harga'], data['disc'], 
+                'massage', data['total_harga'], data['disc'], 
                 data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
                 data['nama_bank'], data['jumlah_bayar'], 0, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -186,13 +170,13 @@ async def storeData(
               q3 = """
                 UPDATE main_transaksi
                 SET
-                  jenis_transaksi = %s, id_detail_transaksi = %s, total_harga = %s, disc = %s, 
+                  jenis_transaksi = %s, total_harga = %s, disc = %s, 
                   grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
                   jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'massage', new_id_dt, data['total_harga'], data['disc'], 
+                'massage', data['total_harga'], data['disc'], 
                 data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
                 data['jumlah_bayar'] - data['grand_total'], jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -203,13 +187,13 @@ async def storeData(
             q3 = """
               UPDATE main_transaksi
               SET
-                jenis_transaksi = %s, id_detail_transaksi = %s, total_harga = %s, disc = %s, 
+                jenis_transaksi = %s, total_harga = %s, disc = %s, 
                 grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, jumlah_kembalian = %s, 
                 jenis_pembayaran = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
-              'massage', new_id_dt, data['total_harga'], data['disc'], 
+              'massage', data['total_harga'], data['disc'], 
               data['grand_total'], "-", 0, 0, jenis_pembayaran,  status_trans,
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
