@@ -2,7 +2,7 @@ import json
 import time
 from typing import Optional
 import uuid
-from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, File, Form, Query, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
 from fastapi_jwt import (
@@ -209,6 +209,56 @@ async def storeData(
         
   except Exception as e:
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+
+@app.get('/selected_food')
+async def getFood(
+  id_trans: str = Query()
+):
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # Paksa Buat Cursor Baru
+          await cursor.close()
+          cursor = await conn.cursor()
+          # End Paksa
+
+          # Query Paket
+          q_paket = f"""
+            SELECT dtf.*, m.nama_fnb FROM detail_transaksi_fnb dtf 
+            INNER JOIN menu_fnb m ON dtf.id_fnb = m.id_fnb
+            WHERE dtf.id_transaksi = %s
+          """ 
+          await cursor.execute(q_paket, (id_trans, ))
+
+          column_names = []
+          for kol in cursor.description:
+            column_names.append(kol[0])
+
+          items = await cursor.fetchall()
+
+          # kalo items hanya return single row, lapis make [] krn pake fetchone, klo fetchall g ush lapis.
+          df = pd.DataFrame(items, columns=column_names)
+
+          # utk return data. ambil index ke-0 krn dia return dalam bentuk list/array
+          return df.to_dict('records')
+
+        except HTTPException as e:
+          return JSONResponse(content={"Status": f"Error {str(e)}"}, status_code=e.status_code)
+
+        except aiomysqlerror as e:
+          return JSONResponse(content={"status": "error", "message": f"Database Error {str(e)}"}, status_code=500)
+        
+        finally:
+          if cursor:
+            await cursor.close()
+        
+
+  except Exception as e:
+    return JSONResponse(content={"status":"error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
   
 @app.post('/store_addon')
 async def storeAddOn(
