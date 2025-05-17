@@ -38,7 +38,7 @@ async def getDataTrans():
         # Ambil data detail transaksi dari record main
         detail_ids = []
         for record in records:
-          detail_ids.append(record['id_detail_transaksi'])
+          detail_ids.append(record['id_transaksi'])
                    
 
         # Buat Placeholder utk In Clause
@@ -49,8 +49,8 @@ async def getDataTrans():
           SELECT dtp.*, m.nama_produk
           FROM detail_transaksi_produk dtp
           LEFT JOIN menu_produk m ON dtp.id_produk = m.id_produk
-          WHERE dtp.id_detail_transaksi IN ({placeholders})
-          ORDER BY dtp.id_detail_transaksi
+          WHERE dtp.id_transaksi IN ({placeholders})
+          ORDER BY dtp.id_transaksi
         """
         await cursor.execute(q_products, detail_ids)
         product_items = await cursor.fetchall()
@@ -63,8 +63,8 @@ async def getDataTrans():
           SELECT dtp.*, m.nama_paket_msg
           FROM detail_transaksi_paket dtp
           LEFT JOIN paket_massage m ON dtp.id_paket = m.id_paket_msg
-          WHERE dtp.id_detail_transaksi IN ({placeholders})
-          ORDER BY dtp.id_detail_transaksi
+          WHERE dtp.id_transaksi IN ({placeholders})
+          ORDER BY dtp.id_transaksi
         """
         await cursor.execute(q_paket, detail_ids)
         paket_item = await cursor.fetchall()
@@ -74,12 +74,12 @@ async def getDataTrans():
 
         # Query food details
         q_food = f"""
-          SELECT dtp.*, m.nama_fnb, k.nama_kategori AS kategori
-          FROM detail_transaksi dtp
-          LEFT JOIN menu_fnb m ON dtp.id_fnb = m.id_fnb
+          SELECT dtf.*, m.nama_fnb, k.nama_kategori AS kategori
+          FROM detail_transaksi_fnb dtf
+          LEFT JOIN menu_fnb m ON dtf.id_fnb = m.id_fnb
           LEFT JOIN kategori_fnb k ON m.id_kategori = k.id_kategori
-          WHERE dtp.id_detail_transaksi IN ({placeholders})
-          ORDER BY dtp.id_detail_transaksi
+          WHERE dtf.id_transaksi IN ({placeholders})
+          ORDER BY dtf.id_transaksi
         """
         await cursor.execute(q_food, detail_ids)
         food_item = await cursor.fetchall()
@@ -91,20 +91,20 @@ async def getDataTrans():
         from collections import defaultdict
         products_by_detail = defaultdict(list)
         for product in product_records:
-          products_by_detail[product['id_detail_transaksi']].append(product)
+          products_by_detail[product['id_transaksi']].append(product)
 
         packages_by_detail = defaultdict(list)
         for package in paket_record:
-          packages_by_detail[package['id_detail_transaksi']].append(package)
+          packages_by_detail[package['id_transaksi']].append(package)
 
         food_by_detail = defaultdict(list)
         for item in food_record:
-          food_by_detail[item['id_detail_transaksi']].append(item)
+          food_by_detail[item['id_transaksi']].append(item)
         # End Grouping
 
         # Combine main records with their details
         for record in records:
-          detail_id = record['id_detail_transaksi']
+          detail_id = record['id_transaksi']
           record['isi_detail_produk'] = products_by_detail.get(detail_id, [])
           record['isi_detail_paket'] = packages_by_detail.get(detail_id, [])
           record['isi_detail_fnb'] = food_by_detail.get(detail_id, [])
