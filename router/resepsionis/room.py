@@ -19,7 +19,7 @@ async def getdataruangan() :
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         # await cursor.execute("COMMIT;")
 
-        q1 = "SELECT * FROM ruangan WHERE status <> 'nonaktif' ORDER BY id_ruangan asc"
+        q1 = "SELECT a.nama_ruangan, a.status,COALESCE(b.sum_durasi_menit, 0) AS sum_durasi_menit, COALESCE(b.kode_ruangan, 'Tidak Ada') AS kode_ruangan FROM ruangan a left join durasi_kerja_sementara b ON a.id_karyawan = b.kode_ruangan ORDER BY a.id_ruangan asc"
 
         await cursor.execute(q1)  
 

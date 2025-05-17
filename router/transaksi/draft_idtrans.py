@@ -111,7 +111,6 @@ async def updateDataDraft(
           await conn.begin()
 
           data = await request.json()
-
           
           if "mode" in data and data['mode'] == "for_massage":
             q1 = """
@@ -123,6 +122,12 @@ async def updateDataDraft(
               data['no_loker'],data['jenis_tamu'], data['no_hp'], data['nama_tamu'],
               data['id_ruangan'], data['id_terapis'], data['id_gro'], id
             ))
+          elif "mode" in data and data['mode'] == "for_fasilitas" :
+            q1 = """
+              UPDATE main_transaksi SET no_loker = %s, jenis_tamu = %s WHERE id_transaksi = %s AND status = 'draft'
+            """
+
+            await cursor.execute(q1,(data['no_loker'], data['jenis_tamu'], id))
           else:
             q1 = """
               UPDATE main_transaksi SET jenis_tamu = %s, no_hp = %s, nama_tamu = %s WHERE id_transaksi = %s AND status = 'draft'
