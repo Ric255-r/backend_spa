@@ -276,12 +276,15 @@ async def storeAddOn(
           # 3. Execute query DT
           data = await request.json()
           id_trans = data['id_transaksi']
+          total_addon = 0
 
           # Pecah kedalam bentuk list, krna detail_trans bentuk array
           # Query Masukin Ke DetailTrans
           details = data.get('detail_trans', [])
           for item in details:
             new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
+            total_addon += item['harga_total']
+
             q2 = """
               INSERT INTO detail_transaksi_fnb(
                 id_detail_transaksi, id_transaksi, id_fnb, qty, satuan, harga_item, harga_total, status, is_addon
@@ -303,6 +306,14 @@ async def storeAddOn(
             """
             await cursor.execute(q4, (id_trans, new_id_dt, 'pending', 1))
         
+          qSelectAddOn = "SELECT total_addon FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectAddOn, (id_trans, ))
+          itemAddOn = await cursor.fetchone()
+          currentTotalAddOn = 0 if not itemAddOn[0] else itemAddOn[0]
+
+          q3 = "UPDATE main_transaksi SET total_addon = %s WHERE id_transaksi = %s"
+          await cursor.execute(q3, (currentTotalAddOn + total_addon, id_trans))
+          
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
