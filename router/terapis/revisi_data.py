@@ -145,8 +145,13 @@ async def addon(
                 total_durasi, item['harga_paket_msg'], item['harga_total'], item['status'], item['is_addon']
               ))
 
+          qSelectAddOn = "SELECT total_addon FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectAddOn, (id_trans, ))
+          itemAddOn = await cursor.fetchone()
+          currentTotalAddOn = 0 if not itemAddOn[0] else itemAddOn[0]
+
           q3 = "UPDATE main_transaksi SET total_addon = %s WHERE id_transaksi = %s"
-          await cursor.execute(q3, (total_addon, id_trans))
+          await cursor.execute(q3, (currentTotalAddOn + total_addon, id_trans))
 
           # Select Durasi Sementaranya lagi
           q4 = "SELECT sum_durasi_menit FROM durasi_kerja_sementara WHERE id_transaksi = %s"
