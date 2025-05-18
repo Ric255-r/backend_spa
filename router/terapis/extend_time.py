@@ -88,6 +88,9 @@ async def save_addon(
             new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
             durasi_tambahan += item['extended_duration']
             
+            qty = int(item['extended_duration']) / int(item['durasi_awal'])
+            harga_total = qty * item['harga_item']
+
             q1 = """
               INSERT INTO detail_transaksi_paket(
                 id_detail_transaksi, id_transaksi, id_paket, qty, satuan, 
@@ -96,14 +99,17 @@ async def save_addon(
               ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             await cursor.execute(q1, (
-              new_id_dt, id_main, item['id_paket'], item['qty'], item['satuan'], 
-              item['durasi_awal'], item['extended_duration'], item['harga_item'], item['harga_total'],
+              new_id_dt, id_main, item['id_paket'], qty, item['satuan'], 
+              item['durasi_awal'], item['extended_duration'], item['harga_item'], harga_total,
               'unpaid', 1
             ))  
 
           for item in detail_produk:
             new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
             durasi_tambahan += item['extended_duration']
+
+            qty = int(item['extended_duration']) / int(item['durasi_awal'])
+            harga_total = qty * item['harga_item']
 
             q2 = """
               INSERT INTO detail_transaksi_produk(
@@ -113,8 +119,8 @@ async def save_addon(
               ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             await cursor.execute(q2, (
-              new_id_dt, id_main, item['id_produk'], item['qty'], item['satuan'], 
-              item['durasi_awal'], item['extended_duration'], item['harga_item'], item['harga_total'],
+              new_id_dt, id_main, item['id_produk'], qty, item['satuan'], 
+              item['durasi_awal'], item['extended_duration'], item['harga_item'], harga_total,
               'unpaid', 1
             ))  
 
