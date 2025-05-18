@@ -60,9 +60,9 @@ async def detailTrans(
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
 
         q1 = """
-          SELECT m.id_transaksi, m.id_detail_transaksi, m.id_ruangan, mf.nama_fnb, dt.qty, dt.satuan 
-          FROM detail_transaksi dt 
-          INNER JOIN main_transaksi m ON m.id_detail_transaksi = dt.id_detail_transaksi
+          SELECT m.id_transaksi, dt.id_detail_transaksi, m.id_ruangan, mf.nama_fnb, dt.qty, dt.satuan 
+          FROM detail_transaksi_fnb dt 
+          INNER JOIN main_transaksi m ON m.id_transaksi = dt.id_transaksi
           INNER JOIN menu_fnb mf ON dt.id_fnb = mf.id_fnb
           INNER JOIN kitchen k ON m.id_transaksi = k.id_transaksi
           WHERE m.id_transaksi = %s AND k.status_pesanan = %s

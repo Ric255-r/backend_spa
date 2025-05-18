@@ -127,7 +127,7 @@ async def verif(
 
 @app.get("/latest_trans")
 async def getLatestTrans(
-  prev_route: Optional[str] = Query(None),
+  id_trans: Optional[str] = Query(None),
   user: JwtAuthorizationCredentials = Security(access_security)
 ):
   try: 
@@ -141,22 +141,29 @@ async def getLatestTrans(
           cursor = await conn.cursor()
           # End Paksa
 
-          # Query Paket
+          # Start Query Paket. jika id_trans ada isiny, maka ambil data yg sedang_dikerjakan = true
           q_paket = f"""
             SELECT dtpa.id_paket, pm.nama_paket_msg, dtpa.durasi_awal, 
             dtpa.total_durasi, pm.detail_paket as deskripsi_paket, m.id_transaksi,
             m.created_at as tgl_transaksi, m.id_terapis, dtpa.id_detail_transaksi,
-            k.nama_karyawan, r.nama_ruangan, r.id_karyawan AS kode_ruangan
+            k.nama_karyawan, r.nama_ruangan, r.id_karyawan AS kode_ruangan, dtpa.status AS status_detail,
+            dtpa.is_addon
             FROM detail_transaksi_paket dtpa 
             INNER JOIN main_transaksi m ON dtpa.id_transaksi = m.id_transaksi
             INNER JOIN karyawan k ON m.id_terapis = k.id_karyawan
             LEFT JOIN ruangan r ON m.id_ruangan = r.id_ruangan
             LEFT JOIN paket_massage pm ON dtpa.id_paket = pm.id_paket_msg
-            WHERE m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if prev_route is None else 'TRUE'}
+            WHERE m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
+            AND m.status NOT IN ('done', 'done-unpaid-addon', 'done-unpaid')
+            {'AND m.id_transaksi = %s' if id_trans is not None else ''}
             ORDER BY m.created_at DESC
           """ 
           # id karyawan disini adlh id akun yg login. berarti id ruangan.
-          await cursor.execute(q_paket, (user['id_ruangan'], ))
+          if id_trans is not None:
+            await cursor.execute(q_paket, (user['id_ruangan'], id_trans))
+          else:
+            await cursor.execute(q_paket, (user['id_ruangan'], ))
+
 
           column_names = []
           for kol in cursor.description:
@@ -172,22 +179,29 @@ async def getLatestTrans(
 
           # End Query Paket
 
-          # Start Query Produk
+          # Start Query Produk. jika id_trans ada isiny, maka ambil data yg sedang_dikerjakan = true
+          # utk ambil data produk yg udah dibookingnya
           q_produk = f"""
             SELECT dtpa.id_produk, mp.nama_produk, dtpa.durasi_awal, 
             dtpa.total_durasi, m.id_transaksi,
             m.created_at as tgl_transaksi, m.id_terapis, dtpa.id_detail_transaksi, 
-            k.nama_karyawan, r.nama_ruangan, r.id_karyawan AS kode_ruangan
+            k.nama_karyawan, r.nama_ruangan, r.id_karyawan AS kode_ruangan, dtpa.status AS status_detail,
+            dtpa.is_addon
             FROM detail_transaksi_produk dtpa 
             INNER JOIN main_transaksi m ON dtpa.id_transaksi = m.id_transaksi
             INNER JOIN karyawan k ON m.id_terapis = k.id_karyawan
             LEFT JOIN ruangan r ON m.id_ruangan = r.id_ruangan
             LEFT JOIN menu_produk mp ON dtpa.id_produk = mp.id_produk
-            WHERE m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if prev_route is None else 'TRUE'}
+            WHERE m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
+            AND m.status NOT IN ('done', 'done-unpaid', 'done-unpaid-addon')
+            {'AND m.id_transaksi = %s' if id_trans is not None else ''}
             ORDER BY m.created_at DESC
           """ 
           # id karyawan disini adlh id akun yg login. berarti id ruangan.
-          await cursor.execute(q_produk, (user['id_ruangan'], ))
+          if id_trans is not None:
+            await cursor.execute(q_produk, (user['id_ruangan'], id_trans))
+          else:
+            await cursor.execute(q_produk, (user['id_ruangan'], ))
 
           column_names = []
           for kol in cursor.description:
@@ -391,7 +405,7 @@ async def insert_datang(
             )
           
           qCheck = """
-            SELECT * FROM terapis_kerja WHERE id_transaksi = %s AND id_terapis = %s
+            SELECT * FROM terapis_kerja WHERE id_transaksi = %s AND id_terapis = %s AND is_cancel != 1
           """
           await cursor.execute(qCheck, (data['id_transaksi'], data['id_terapis']))
           items = await cursor.fetchone()
@@ -520,6 +534,88 @@ async def tunda(
         
   except Exception as e:
     return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+  
+@app.put('/selesai')
+async def selesai(
+  request: Request,
+  selesai_awal: Optional[str] = Query(None),
+) :
+  try: 
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          await conn.begin()
+
+          data = await request.json()
+
+          qSelect = f"""
+            SELECT id_ruangan, id_terapis, no_loker, total_addon, status FROM main_transaksi 
+            WHERE id_transaksi = %s
+          """
+          await cursor.execute(qSelect, (data['id_transaksi'], ))
+          items = await cursor.fetchone()
+
+          id_ruangan = items[0]
+          id_terapis = items[1]
+          no_loker = items[2]
+          total_addon = items[3]
+          status = items[4]
+
+          mode = ""
+          if total_addon == 0 and status == 'paid':
+            mode = 'done'
+          elif total_addon != 0 and status == 'paid':
+            mode = 'done-unpaid-addon'
+          elif total_addon != 0 and status == 'unpaid': 
+            mode = 'done-unpaid'
+          elif total_addon == 0 and status == 'unpaid':
+            mode = 'done-unpaid'
+          
+          q1 = f"""
+            UPDATE main_transaksi SET sedang_dikerjakan = FALSE,
+            status = '{mode}' WHERE id_transaksi = %s
+          """
+          await cursor.execute(q1, (data['id_transaksi'], ))
+
+          q2 = f"""
+            UPDATE ruangan SET status = 'maintenance' WHERE id_ruangan = %s
+          """
+          await cursor.execute(q2, (id_ruangan, ))
+        
+          q3 = f"""
+            UPDATE karyawan SET is_occupied = 0 WHERE id_karyawan = %s
+          """
+          await cursor.execute(q3, (id_terapis, ))
+
+          q4 = f"""
+            UPDATE terapis_kerja SET jam_selesai = NOW() 
+            {', alasan = %s' if selesai_awal is not None else ''}
+            WHERE id_transaksi = %s and id_terapis = %s
+          """
+          if selesai_awal is not None:
+            await cursor.execute(q4, (selesai_awal, data['id_transaksi'], id_terapis))
+          else:
+            await cursor.execute(q4, (data['id_transaksi'], id_terapis))
+
+          q5 = "DELETE FROM durasi_kerja_sementara WHERE id_transaksi = %s"
+          await cursor.execute(q5, (data['id_transaksi'], ))
+
+          await conn.commit()
+
+          print("Berhasil Eksekusi Semua Fungsi diatas")
+        except HTTPException as e:
+          await conn.rollback()
+          return JSONResponse(content={"Status": f"Error {str(e)}"}, status_code=e.status_code)
+
+        except aiomysqlerror as e:
+          await conn.rollback()
+          return JSONResponse(content={"status": "error", "message": f"Database Error {str(e)}"}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
 @app.put('/update_menit')
 async def update_menit(
@@ -570,7 +666,25 @@ async def delete_waktu(
           q1 = "DELETE FROM durasi_kerja_sementara WHERE id_transaksi = %s"
           await cursor.execute(q1, (data['id_transaksi'], ))
 
+          q2 = "UPDATE main_transaksi SET sedang_dikerjakan = FALSE, status = 'done' WHERE id_transaksi = %s"
+          await cursor.execute(q2, (data['id_transaksi'], ))
+
+          q3 = "SELECT id_ruangan, id_terapis FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(q3, (data['id_transaksi'], ))
+          items = await cursor.fetchone()
+
+          id_ruangan = items[0]
+          id_terapis = items[1]
+
+          q4 = "UPDATE karyawan SET is_occupied = FALSE WHERE id_karyawan = %s"
+          await cursor.execute(q4, (id_terapis, ))
+
+          q5 = "UPDATE ruangan SET status = 'aktif' WHERE id_ruangan = %s"
+          await cursor.execute(q5, (id_ruangan, ))
+
           await conn.commit()
+
+          return JSONResponse(content={"Status": f"Selesai Transaksi"}, status_code=200)
         except HTTPException as e:
           await conn.rollback()
           return JSONResponse(content={"Status": f"Error {str(e)}"}, status_code=e.status_code)
