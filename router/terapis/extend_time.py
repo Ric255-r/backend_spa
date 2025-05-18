@@ -83,6 +83,7 @@ async def save_addon(
           detail_paket = data.get('detail_paket', [])
           detail_produk = data.get('detail_produk', [])
           durasi_tambahan = 0
+          total_addon = 0
 
           for item in detail_paket:
             new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
@@ -90,6 +91,7 @@ async def save_addon(
             
             qty = int(item['extended_duration']) / int(item['durasi_awal'])
             harga_total = qty * item['harga_item']
+            total_addon += harga_total
 
             q1 = """
               INSERT INTO detail_transaksi_paket(
@@ -110,6 +112,7 @@ async def save_addon(
 
             qty = int(item['extended_duration']) / int(item['durasi_awal'])
             harga_total = qty * item['harga_item']
+            total_addon += harga_total
 
             q2 = """
               INSERT INTO detail_transaksi_produk(
@@ -124,29 +127,35 @@ async def save_addon(
               'unpaid', 1
             ))  
 
-          # # Select kode maintransaksi utk update tabel durasi sementara
-          # q3 = """
-          #   SELECT id_transaksi FROM main_transaksi WHERE id_detail_transaksi = %s
-          # """
-          # await cursor.execute(q3, (id_dt, ))  
+          # Select kode maintransaksi utk update tabel durasi sementara
+          q3 = """
+            SELECT total_addon FROM main_transaksi WHERE id_transaksi = %s
+          """
+          await cursor.execute(q3, (id_main, ))  
 
-          # itemsTrans = await cursor.fetchone()
-          # id_main = itemsTrans[0]
+          itemsTrans = await cursor.fetchone()
+          addon_awal = itemsTrans[0]
+
+          q4 = """
+            UPDATE main_transaksi SET total_addon = %s WHERE id_transaksi = %s
+          """
+          await cursor.execute(q4, (total_addon + addon_awal, ))  
+          await conn.commit()
 
           # Select durasi_kerja_sementara utk dapetin sum_durasi_menit yg tersimpan
-          q4 = """
+          q5 = """
             SELECT sum_durasi_menit FROM durasi_kerja_sementara WHERE id_transaksi = %s
           """
-          await cursor.execute(q4, (id_main, ))  
+          await cursor.execute(q5, (id_main, ))  
 
           itemsDurasi = await cursor.fetchone()
           savedDurasi = itemsDurasi[0]
 
           # Baru update, dgn kalkulasi menit yg lama dgn yg di extend
-          q5 = """
+          q6 = """
             UPDATE durasi_kerja_sementara SET sum_durasi_menit = %s WHERE id_transaksi = %s
           """
-          await cursor.execute(q5, (savedDurasi + durasi_tambahan, id_main))  
+          await cursor.execute(q6, (savedDurasi + durasi_tambahan, id_main))  
           await conn.commit()
 
         except aiomysqlerror as e:
