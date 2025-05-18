@@ -569,7 +569,9 @@ async def selesai(
             mode = 'done'
           elif total_addon != 0 and status == 'paid':
             mode = 'done-unpaid-addon'
-          elif (total_addon != 0 and status == 'unpaid') or (total_addon == 0 and status == 'unpaid'): 
+          elif total_addon != 0 and status == 'unpaid': 
+            mode = 'done-unpaid'
+          elif total_addon == 0 and status == 'unpaid':
             mode = 'done-unpaid'
           
           q1 = f"""
