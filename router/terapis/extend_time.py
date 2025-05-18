@@ -127,7 +127,7 @@ async def save_addon(
               'unpaid', 1
             ))  
 
-          # Select kode maintransaksi utk update tabel durasi sementara
+          # Select kode maintransaksi utk update addon
           q3 = """
             SELECT total_addon FROM main_transaksi WHERE id_transaksi = %s
           """
@@ -139,7 +139,7 @@ async def save_addon(
           q4 = """
             UPDATE main_transaksi SET total_addon = %s WHERE id_transaksi = %s
           """
-          await cursor.execute(q4, (total_addon + addon_awal, ))  
+          await cursor.execute(q4, (total_addon + addon_awal, id_main))  
           await conn.commit()
 
           # Select durasi_kerja_sementara utk dapetin sum_durasi_menit yg tersimpan
