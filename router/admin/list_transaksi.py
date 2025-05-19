@@ -28,8 +28,8 @@ async def getDataTrans(
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         q1 = f"""
           SELECT mt.*, COALESCE(r.nama_ruangan, '-') AS nama_ruangan FROM main_transaksi mt 
-          LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan WHERE status != 'draft'
-          {'AND DATE(created_at) = CURDATE()' if hak_akses == 'resepsionis' else ''}
+          LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan WHERE mt.status != 'draft'
+          {'AND DATE(mt.created_at) = CURDATE()' if hak_akses == 'resepsionis' else ''}
           ORDER BY mt.id_transaksi ASC
         """
         await cursor.execute(q1)
