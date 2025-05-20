@@ -242,3 +242,105 @@ async def storeData(
         
   except Exception as e:
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+
+
+@app.put('/pelunasan')
+async def pelunasan(
+  request: Request
+):
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # 1. Start Transaction
+          await conn.begin()
+
+          data = await request.json()
+          # data main transaksi
+          id_trans = data['id_transaksi']
+          metode_bayar = data['metode_pembayaran']
+          jlhbyr_addon = data['jumlah_bayar']
+
+          q1 = """
+            SELECT grand_total, total_addon FROM main_transaksi
+            WHERE id_transaksi = %s
+          """
+          await cursor.execute(q1, (id_trans, ))
+
+          # Pake await fetchone, krn hanya mw ambil 1 baris data.
+          # rSelect = result select
+          rSelect = await cursor.fetchone()
+          grand_total = rSelect[0]
+          total_addon = rSelect[1]
+
+          if metode_bayar == "debit" or metode_bayar == "qris":
+            nama_akun = data['nama_akun']
+            no_rek = data['no_rek']
+            nama_bank = data['nama_bank']
+
+            q2 = """
+              UPDATE main_transaksi SET grand_total = %s, total_addon = %s, status = %s,
+              nama_akun = %s, no_rek = %s, nama_bank = %s
+              WHERE id_transaksi = %s
+            """
+            await cursor.execute(q2, (grand_total + total_addon, 0, 'done', nama_akun, no_rek, nama_bank, id_trans))
+          else:
+            q2 = """
+              UPDATE main_transaksi SET grand_total = %s, total_addon = %s, status = %s WHERE id_transaksi = %s
+            """
+            await cursor.execute(q2, (grand_total + total_addon, 0, 'done', id_trans))
+
+          q3 = """
+            UPDATE detail_transaksi_produk SET status = 'paid' WHERE id_transaksi = %s
+          """
+          await cursor.execute(q3, (id_trans, ))
+
+          q4 = """
+            UPDATE detail_transaksi_paket SET status = 'paid' WHERE id_transaksi = %s
+          """
+          await cursor.execute(q4, (id_trans, ))
+
+          q5 = """
+            UPDATE detail_transaksi_fnb SET status = 'paid' WHERE id_transaksi = %s
+          """
+          await cursor.execute(q5, (id_trans, ))
+
+          q6 = """
+            UPDATE detail_transaksi_fasilitas SET status = 'paid' WHERE id_transaksi = %s
+          """
+          await cursor.execute(q6, (id_trans, ))
+
+        
+          # Klo Sukses, dia bkl save ke db
+          await conn.commit()
+
+          # Ini utk aktifkan websocket kirim ke admin
+          # for ws_con in kitchen_connection:
+          #   await ws_con.send_text(
+          #     json.dumps({
+          #       "id_transaksi": data['id_transaksi'],
+          #       "status": "PENDING",
+          #       "message": "Ada Order Baru"
+          #     })
+          #   )
+
+
+          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
+        except aiomysqlerror as e:
+          # Rollback Input Jika Error
+
+          # Ambil Error code
+          error_code = e.args[0] if e.args else "Unknown"
+          
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+        
+        except Exception as e:
+          await conn.rollback()
+          print(f"Error {e}")
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
