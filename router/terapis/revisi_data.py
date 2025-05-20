@@ -120,10 +120,9 @@ async def updateRuangan(
           await cursor.execute(q4, (new_kode_ruangan, ))
 
           q5 = "UPDATE durasi_kerja_sementara SET kode_ruangan = %s WHERE id_transaksi = %s"
-          await cursor.execute(q5, (new_kode_ruangan, ))
+          await cursor.execute(q5, (new_kode_ruangan, id_transaksi))
 
           await conn.commit()
-
         except aiomysqlerror as e:
           await conn.rollback()
           return JSONResponse(content={"Error Mysql": str(e)}, status_code=500)
