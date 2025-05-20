@@ -119,6 +119,9 @@ async def updateRuangan(
           q4 = "UPDATE ruangan SET status = 'occupied' WHERE id_karyawan = %s"
           await cursor.execute(q4, (new_kode_ruangan, ))
 
+          q5 = "UPDATE durasi_kerja_sementara SET kode_ruangan = %s WHERE id_transaksi = %s"
+          await cursor.execute(q5, (new_kode_ruangan, ))
+
           await conn.commit()
 
         except aiomysqlerror as e:
