@@ -73,7 +73,6 @@ async def kitchen_ws(
     kitchen_connection.remove(websocket)
   
 
-
 @app.get('/menu')
 async def getMenu():
   try:
@@ -112,6 +111,12 @@ async def storeData(
           # 3. Execute query DT
           data = await request.json()
 
+          seconds_local = time.time()
+          # Convert to milliseconds
+          milliseconds_local = int(seconds_local * 1000)
+          # untuk id batch makanan. 
+          id_batch = "BA" + str(milliseconds_local).zfill(16)
+
           # Pecah kedalam bentuk list, krna detail_trans bentuk array
           # Query Masukin Ke DetailTrans
           details = data.get('detail_trans', [])
@@ -137,13 +142,13 @@ async def storeData(
             # Masukin ke tabel kitchen juga
             q4 = """
               INSERT INTO kitchen(
-                id_transaksi, id_detail_transaksi, status_pesanan, is_addon
+                id_transaksi, id_detail_transaksi, status_pesanan, is_addon, id_batch
               ) 
               VALUES(
-                %s, %s, %s, %s
+                %s, %s, %s, %s, %s
               )
             """
-            await cursor.execute(q4, (data['id_transaksi'], new_id_dt, 'pending', 0))
+            await cursor.execute(q4, (data['id_transaksi'], new_id_dt, 'pending', 0, id_batch))
 
           #Query Masukin ke Transaksi
           if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
@@ -276,12 +281,21 @@ async def storeAddOn(
           # 3. Execute query DT
           data = await request.json()
           id_trans = data['id_transaksi']
+          total_addon = 0
+
+          seconds_local = time.time()
+          # Convert to milliseconds
+          milliseconds_local = int(seconds_local * 1000)
+          # untuk id batch makanan. 
+          id_batch = "BA" + str(milliseconds_local).zfill(16)
 
           # Pecah kedalam bentuk list, krna detail_trans bentuk array
           # Query Masukin Ke DetailTrans
           details = data.get('detail_trans', [])
           for item in details:
             new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
+            total_addon += item['harga_total']
+
             q2 = """
               INSERT INTO detail_transaksi_fnb(
                 id_detail_transaksi, id_transaksi, id_fnb, qty, satuan, harga_item, harga_total, status, is_addon
@@ -295,14 +309,22 @@ async def storeAddOn(
             # Masukin ke tabel kitchen juga
             q4 = """
               INSERT INTO kitchen(
-                id_transaksi, id_detail_transaksi, status_pesanan, is_addon
+                id_transaksi, id_detail_transaksi, status_pesanan, is_addon, id_batch
               ) 
               VALUES(
-                %s, %s, %s, %s
+                %s, %s, %s, %s, %s
               )
             """
-            await cursor.execute(q4, (id_trans, new_id_dt, 'pending', 1))
+            await cursor.execute(q4, (id_trans, new_id_dt, 'pending', 1, id_batch))
         
+          qSelectAddOn = "SELECT total_addon FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectAddOn, (id_trans, ))
+          itemAddOn = await cursor.fetchone()
+          currentTotalAddOn = 0 if not itemAddOn[0] else itemAddOn[0]
+
+          q3 = "UPDATE main_transaksi SET total_addon = %s WHERE id_transaksi = %s"
+          await cursor.execute(q3, (currentTotalAddOn + total_addon, id_trans))
+          
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
@@ -315,7 +337,6 @@ async def storeAddOn(
                 "message": "Ada Order Baru"
               })
             )
-
 
           return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
         except aiomysqlerror as e:

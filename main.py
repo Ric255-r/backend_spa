@@ -42,6 +42,7 @@ from router.transaksi.fasilitas import app as app_fasilitas
 from router.transaksi.regis_member import app as app_regis_member
 from router.admin.list_member import app as app_listmember
 from router.terapis.revisi_data import app as app_revisiservice
+from router.terapis.savekomisi import app as app_savekomisi
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -97,6 +98,7 @@ main_router.include_router(app_fasilitas)
 main_router.include_router(app_regis_member)
 main_router.include_router(app_listmember)
 main_router.include_router(app_revisiservice)
+main_router.include_router(app_savekomisi)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
 

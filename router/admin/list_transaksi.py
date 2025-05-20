@@ -1,7 +1,7 @@
 from typing import Optional
 import uuid
 import aiomysql
-from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
 from fastapi_jwt import (
@@ -17,14 +17,21 @@ app = APIRouter(
 )
 
 @app.get('/datatrans')
-async def getDataTrans():
+async def getDataTrans(
+  hak_akses: Optional[str] = Query(None)
+):
   try:
     pool = await get_db() # Get The pool
 
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
-        q1 = "SELECT mt.*, COALESCE(r.nama_ruangan, '-') AS nama_ruangan FROM main_transaksi mt LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan ORDER BY mt.id_transaksi ASC"
+        q1 = f"""
+          SELECT mt.*, COALESCE(r.nama_ruangan, '-') AS nama_ruangan FROM main_transaksi mt 
+          LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan WHERE mt.status != 'draft'
+          {'AND DATE(mt.created_at) = CURDATE()' if hak_akses == 'resepsionis' else ''}
+          ORDER BY mt.id_transaksi ASC
+        """
         await cursor.execute(q1)
 
         items = await cursor.fetchall()
@@ -168,6 +175,16 @@ async def get_detail(
           await cursor.execute(q_food, (id_trans, ))
           food_item = await cursor.fetchall()
 
+          q_fasilitas = """
+            SELECT dtf.*, p.nama_fasilitas, p.harga_fasilitas
+            FROM detail_transaksi_fasilitas dtf
+            LEFT JOIN paket_fasilitas p ON dtf.id_fasilitas = p.id_fasilitas
+            WHERE dtf.id_transaksi = %s
+            ORDER BY dtf.id_transaksi
+          """
+          await cursor.execute(q_fasilitas, (id_trans, ))
+          fasilitas_item = await cursor.fetchall()
+
           # proses field product
           product_ori = [item for item in product_items if item['is_addon'] == 0]
           product_addon = []
@@ -192,10 +209,14 @@ async def get_detail(
               item['type'] = "fnb"
               food_addon.append(item)
 
+          # proses field fasilitas
+          fasilitas_ori = [item for item in fasilitas_item]
+
           return {
             "detail_produk": product_ori,
             "detail_paket": paket_ori,
             "detail_food": food_ori,
+            "detail_fasilitas": fasilitas_ori,
             # satuin semua listnya
             "all_addon": product_addon + paket_addon + food_addon 
           }
