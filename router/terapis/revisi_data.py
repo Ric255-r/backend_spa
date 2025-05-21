@@ -86,6 +86,54 @@ async def updateTerapis(
   except Exception as e:
     return JSONResponse({"Error Get Menu Fnb": str(e)}, status_code=500)
   
+@app.put('/ruangan')
+async def updateRuangan(
+  request: Request
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        try:
+          await conn.begin()
+
+          data = await request.json()
+          id_transaksi = data['id_transaksi']
+          prev_kode_ruangan = data['prev_kode_ruangan']
+          new_kode_ruangan = data['new_kode_ruangan']
+
+          qSelect = "SELECT id_ruangan FROM ruangan WHERE id_karyawan = %s"
+          await cursor.execute(qSelect, (new_kode_ruangan, ))
+          items = await cursor.fetchone()
+
+          q1 = "UPDATE main_transaksi SET id_ruangan = %s, sedang_dikerjakan = 0 WHERE id_transaksi = %s"
+          await cursor.execute(q1, (items[0], id_transaksi))
+
+          q2 = "UPDATE terapis_kerja SET is_tunda = 1 WHERE id_transaksi = %s"
+          await cursor.execute(q2, (id_transaksi))
+
+          q3 = "UPDATE ruangan SET status = 'aktif' WHERE id_karyawan = %s"
+          await cursor.execute(q3, (prev_kode_ruangan, ))
+
+          q4 = "UPDATE ruangan SET status = 'occupied' WHERE id_karyawan = %s"
+          await cursor.execute(q4, (new_kode_ruangan, ))
+
+          q5 = "UPDATE durasi_kerja_sementara SET kode_ruangan = %s WHERE id_transaksi = %s"
+          await cursor.execute(q5, (new_kode_ruangan, id_transaksi))
+
+          await conn.commit()
+        except aiomysqlerror as e:
+          await conn.rollback()
+          return JSONResponse(content={"Error Mysql": str(e)}, status_code=500)
+        
+        except HTTPException as e:
+          await conn.rollback()
+          return JSONResponse(content={"Error HTTP": str(e.detail)}, status_code=e.status_code)
+
+  except Exception as e:
+    return JSONResponse({"Error Get Menu Fnb": str(e)}, status_code=500)
+
 @app.post('/addon')
 async def addon(
   request: Request,
