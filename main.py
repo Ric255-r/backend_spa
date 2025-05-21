@@ -43,6 +43,7 @@ from router.transaksi.regis_member import app as app_regis_member
 from router.admin.list_member import app as app_listmember
 from router.terapis.revisi_data import app as app_revisiservice
 from router.terapis.savekomisi import app as app_savekomisi
+from router.transaksi.member import app as app_transmember
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -99,6 +100,7 @@ main_router.include_router(app_regis_member)
 main_router.include_router(app_listmember)
 main_router.include_router(app_revisiservice)
 main_router.include_router(app_savekomisi)
+main_router.include_router(app_transmember)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
 
@@ -111,4 +113,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="192.168.1.17", port=5500)
+  uvicorn.run(app, host="192.168.31.63", port=5500)
