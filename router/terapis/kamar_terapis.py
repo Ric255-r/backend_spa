@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, File, Form, Query, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -13,6 +14,7 @@ import pandas as pd
 from aiomysql import Error as aiomysqlerror
 from jwt_auth import access_security, refresh_security
 from datetime import timedelta
+import traceback
 
 app = APIRouter(
   prefix="/kamar_terapis"
@@ -155,6 +157,7 @@ async def getLatestTrans(
             LEFT JOIN paket_massage pm ON dtpa.id_paket = pm.id_paket_msg
             WHERE m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
             AND m.status NOT IN ('done', 'done-unpaid-addon', 'done-unpaid', 'draft')
+            AND dtpa.is_returned != 1
             {'AND m.id_transaksi = %s' if id_trans is not None else ''}
             ORDER BY m.created_at DESC
           """ 
@@ -534,6 +537,120 @@ async def tunda(
         
   except Exception as e:
     return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+@app.put('/retur_paket')
+async def returPaket(
+  request: Request
+): 
+  try: 
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try:
+          await conn.begin()
+
+          data = await request.json()
+          id_transaksi = data['id_transaksi']
+          id_detail_diretur = data['id_detail_diretur']
+          alasan_retur = data['alasan_retur']
+          # time_spent = data['time_spent']
+          # krn bentuk object, pake get
+          pengganti = data.get('item_pengganti')
+          new_id = f"DT{uuid.uuid4().hex[:16]}".upper()
+          table_retur = "detail_transaksi_paket"
+
+          # Query utk tandai item lama yg diretur
+          q1 = f"""
+            UPDATE {table_retur} SET 
+              is_returned = 1, alasan_retur = %s, replaced_by_id_detail = %s, status = 'retur' 
+              WHERE id_detail_transaksi = %s
+          """
+          await cursor.execute(q1, (alasan_retur, new_id, id_detail_diretur))
+
+          # Tambah Item Pengganti
+          if pengganti:
+            q2 = f"""
+              INSERT INTO {table_retur} (
+                id_detail_transaksi, id_transaksi, {'id_produk' if table_retur == "detail_transaksi_produk" else 'id_paket'},
+                qty, satuan, durasi_awal, 
+                total_durasi, harga_item, harga_total, status, is_addon
+              ) VALUES (
+                %s, %s, %s,
+                %s, %s, %s, 
+                %s, %s, %s, %s, %s
+              )
+            """
+            id_pengganti = pengganti['id_produk'] if table_retur == "detail_transaksi_produk" else pengganti['id_paket_msg']
+            # Default Qty = 1
+            qty = 1 if 'qty' not in pengganti else pengganti['qty']
+            hrg_total_pengganti = qty * pengganti['harga_paket_msg']
+            total_durasi_pengganti = qty * pengganti['durasi']
+
+            await cursor.execute(q2, (
+              new_id, id_transaksi, id_pengganti, 
+              qty, 'paket', pengganti['durasi'],
+              total_durasi_pengganti, pengganti['harga_paket_msg'],
+              hrg_total_pengganti, 'unpaid', 0
+            ))
+
+          # Bagian Tarik Data Main Transaksi
+          qSelectMain = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectMain, (id_transaksi, ))
+          items = await cursor.fetchone()
+          total_hrg_awal = items['total_harga']
+          disc_awal = items['disc']
+          # End Bagian Tarik Data Main
+
+          # Tarik Data yg diretur
+          qSelectDetail = "SELECT harga_total, total_durasi FROM detail_transaksi_paket WHERE id_detail_transaksi = %s"
+          await cursor.execute(qSelectDetail, (id_detail_diretur, ))
+          items2 = await cursor.fetchone()
+          harga_retur = items2['harga_total']
+          retur_durasi = items2['total_durasi']
+          # End Tarik data Yg diretur
+
+          # Update main Transaksi
+          total_hrg_baru = total_hrg_awal - harga_retur + hrg_total_pengganti
+          g_total_baru = 0
+          if not disc_awal or disc_awal is None or disc_awal == "" or disc_awal == 0:
+            g_total_baru = total_hrg_baru
+          else:
+            nominal_disc = total_hrg_baru * disc_awal
+            g_total_baru = total_hrg_baru - nominal_disc
+
+          q3 = """
+            UPDATE main_transaksi SET sedang_dikerjakan = 1, total_harga = %s, grand_total = %s 
+            WHERE id_transaksi = %s
+          """
+          await cursor.execute(q3, (total_hrg_baru, g_total_baru, id_transaksi))
+          # End Update Main Transaksi
+
+          # Tarik data lama durasi_kerja_sementara
+          qSelectDurasi = "SELECT * FROM durasi_kerja_sementara WHERE id_transaksi = %s"
+          await cursor.execute(qSelectDurasi, (id_transaksi, ))
+          items3 = await cursor.fetchone()
+          durasi_lama = items3['sum_durasi_menit']
+          # ubah timespent ke menit
+          # menit_kepakai = ()
+          formula_durasi = durasi_lama - retur_durasi + total_durasi_pengganti
+          # End Tarik durasi_kerja_sementara
+          
+          q4 = "UPDATE durasi_kerja_sementara SET sum_durasi_menit = %s WHERE id_transaksi = %s"
+          await cursor.execute(q4, (formula_durasi, id_transaksi))
+
+          await conn.commit()
+        except HTTPException as e:
+          await conn.rollback()
+          return JSONResponse(content={"Status": f"Error {str(e)}"}, status_code=e.status_code)
+
+        except aiomysqlerror as e:
+          await conn.rollback()
+          return JSONResponse(content={"status": "error", "message": f"Database Error {str(e)}"}, status_code=500)
+        
+  except Exception as e:
+    error_details = traceback.format_exc()
+    return JSONResponse(content={"status": "error", "message": f"Koneksi Error {error_details}"}, status_code=500)
   
   
 @app.put('/selesai')
