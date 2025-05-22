@@ -27,7 +27,7 @@ async def getdatapromohappyhour() :
             b.disc, b.member, b.vip 
             FROM promo a 
             INNER JOIN detail_promo_happyhour b 
-            ON a.kode_detail_promo = b.detail_kode_promo 
+            ON a.detail_kode_promo = b.detail_kode_promo 
             ORDER BY a.kode_promo ASC;
             """
         await cursor.execute(q1)  
@@ -138,10 +138,12 @@ async def getdatapromokunjungan() :
 
         q1 = """
             SELECT a.kode_promo, a.nama_promo, 
-            b.detail_kode_promo, b.limit_kunjungan, b.harga_promo
+            b.detail_kode_promo, b.limit_kunjungan, b.harga_promo, b.durasi, b.discount, b.limit_promo, c.nama_paket_msg, c.harga_paket_msg
             FROM promo a 
             INNER JOIN detail_promo_kunjungan b 
-            ON a.kode_detail_promo = b.detail_kode_promo 
+            ON a.detail_kode_promo = b.detail_kode_promo
+            INNER JOIN paket_massage c
+            ON a.nama_promo = c.nama_paket_msg
             ORDER BY a.kode_promo ASC;
             """
         await cursor.execute(q1)  
@@ -173,9 +175,9 @@ async def updatepromokunjungan(
           # 2. Execute querynya
           data = await request.json()
           q1 = "UPDATE promo SET nama_promo = %s , updated_at = %s WHERE kode_promo = %s"
-          await cursor.execute(q1, (data['nama_promo'],datetime.now(),data['kode_promo']))
-          q2 = "UPDATE detail_promo_kunjungan SET limit_kunjungan = %s, harga_promo = %s, updated_at = %s WHERE detail_kode_promo = %s"
-          await cursor.execute(q2, (data['limit_kunjungan'],data['harga_promo'],datetime.now(),data['detail_kode_promo']))
+          await cursor.execute(q1,data['nama_promo'],datetime.now(),data['kode_promo'])
+          q2 = "UPDATE detail_promo_kunjungan SET limit_kunjungan = %s, limit_promo = %s, harga_promo = %s, discount = %s, updated_at = %s WHERE detail_kode_promo = %s"
+          await cursor.execute(q2, (data['limit_kunjungan'],data['limit_promo'],data['harga_promo'],data['discount'],datetime.now(),data['detail_kode_promo']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
@@ -254,7 +256,7 @@ async def getdatapromotahunan() :
             b.detail_kode_promo, b.jangka_tahun, b.harga_promo
             FROM promo a 
             INNER JOIN detail_promo_tahunan b 
-            ON a.kode_detail_promo = b.detail_kode_promo 
+            ON a.detail_kode_promo = b.detail_kode_promo 
             ORDER BY a.kode_promo ASC;
             """
         await cursor.execute(q1)  

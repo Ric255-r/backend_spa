@@ -52,6 +52,7 @@ async def postpaket(
 
           # 2. Execute querynya
           data = await request.json()
+          print(data)
           q1 = "INSERT INTO komisi(id_karyawan, id_transaksi, nominal_komisi) VALUES(%s, %s, %s)"
           await cursor.execute(q1, (data['id_karyawan'], data['id_transaksi'], data['nominal_komisi']))
 
