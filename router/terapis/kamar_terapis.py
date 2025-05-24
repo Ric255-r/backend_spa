@@ -600,6 +600,8 @@ async def returPaket(
           items = await cursor.fetchone()
           total_hrg_awal = items['total_harga']
           disc_awal = items['disc']
+          jumlah_byr_awal = items['jumlah_bayar']
+          status_awal = items['status']
           # End Bagian Tarik Data Main
 
           # Tarik Data yg diretur
@@ -619,8 +621,9 @@ async def returPaket(
             nominal_disc = total_hrg_baru * disc_awal
             g_total_baru = total_hrg_baru - nominal_disc
 
-          q3 = """
-            UPDATE main_transaksi SET sedang_dikerjakan = 1, total_harga = %s, grand_total = %s 
+          q3 = f"""
+            UPDATE main_transaksi SET sedang_dikerjakan = 1, total_harga = %s, grand_total = %s
+            {", status = 'unpaid'" if g_total_baru > jumlah_byr_awal else ''}
             WHERE id_transaksi = %s
           """
           await cursor.execute(q3, (total_hrg_baru, g_total_baru, id_transaksi))

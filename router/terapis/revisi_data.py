@@ -134,7 +134,7 @@ async def updateRuangan(
   except Exception as e:
     return JSONResponse({"Error Get Menu Fnb": str(e)}, status_code=500)
 
-@app.post('/addon')
+@app.post('/tambahpaket_produk')
 async def addon(
   request: Request,
 ):
