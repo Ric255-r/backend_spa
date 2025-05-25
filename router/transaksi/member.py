@@ -22,8 +22,8 @@ app = APIRouter(
   # dependencies=[Depends(verify_jwt)]
 )
 
-@app.get('/getkodepaket')
-async def getFasilitas():
+@app.get('/getpaket')
+async def getPaket():
   try:
     pool = await get_db() # Get The pool
 
@@ -33,7 +33,17 @@ async def getFasilitas():
 
         # await asyncio.sleep(0.3)
 
-        q1 = "SELECT * FROM promo "
+        q1 = """
+        SELECT 
+    p.kode_promo,
+    p.nama_promo,
+    d.limit_kunjungan,
+    d.harga_promo
+    FROM promo p
+    JOIN detail_promo_kunjungan d
+    ON p.detail_kode_promo = d.detail_kode_promo
+    WHERE p.detail_kode_promo LIKE 'DK%'
+        """
         await cursor.execute(q1)
 
         items = await cursor.fetchall()
@@ -46,8 +56,44 @@ async def getFasilitas():
         return df.to_dict('records')
 
   except Exception as e:
-    return JSONResponse({"Error Get Paket Fasilitas": str(e)}, status_code=500)
+    return JSONResponse({"Error Get Paket Massage": str(e)}, status_code=500)
 
+@app.get('/gettahunan')
+async def getTahunan():
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+
+        # await asyncio.sleep(0.3)
+
+        q1 = """
+        SELECT 
+    p.kode_promo,
+    p.nama_promo,
+    d.jangka_tahun,
+    d.harga_promo
+FROM promo p
+JOIN detail_promo_tahunan d
+    ON p.detail_kode_promo = d.detail_kode_promo
+WHERE p.detail_kode_promo LIKE 'DT%'
+        """
+        await cursor.execute(q1)
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Paket Tahunan": str(e)}, status_code=500)
+  
 @app.post('/store')
 async def storeData(
   request: Request
