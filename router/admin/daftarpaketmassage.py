@@ -52,8 +52,8 @@ async def postpaketmassage(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO paket_massage(id_paket_msg,nama_paket_msg,harga_paket_msg,durasi,nominal_komisi,tipe_komisi,detail_paket) VALUES(%s, %s, %s, %s, %s, %s, %s)"
-          await cursor.execute(q1, (lastidpaketmsg,data['nama_paket_msg'], data['harga_paket_msg'], data['durasi'],data['nominal_komisi'],data['tipe_komisi'],data['detail_paket']))
+          q1 = "INSERT INTO paket_massage(id_paket_msg,nama_paket_msg,harga_paket_msg,durasi,nominal_komisi,tipe_komisi,tipe_komisi_gro,nominal_komisi_gro,detail_paket) VALUES(%s, %s, %s, %s, %s, %s, %s,%s,%s)"
+          await cursor.execute(q1, (lastidpaketmsg,data['nama_paket_msg'], data['harga_paket_msg'], data['durasi'],data['nominal_komisi'],data['tipe_komisi'],data['tipe_komisi_gro'],data['nominal_komisi_gro'],data['detail_paket']))
 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
