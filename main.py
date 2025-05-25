@@ -42,12 +42,8 @@ from router.transaksi.fasilitas import app as app_fasilitas
 from router.transaksi.regis_member import app as app_regis_member
 from router.admin.list_member import app as app_listmember
 from router.terapis.revisi_data import app as app_revisiservice
-<<<<<<< HEAD
-from router.terapis.savekomisi import app as app_savekomisi 
-=======
 from router.terapis.savekomisi import app as app_savekomisi
 from router.transaksi.member import app as app_transmember
->>>>>>> 6dfe2ace8d012d923356aebaf077adc661b20137
 from jwt_auth import access_security
 
 from koneksi import lifespan
