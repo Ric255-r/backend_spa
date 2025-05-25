@@ -75,3 +75,33 @@ async def postAbsenTerapis(
         
   except Exception as e:
     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
+@app.delete('/delete_absen')
+async def deleteAbsenTerapis(
+  request: Request
+):
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          q1 = "TRUNCATE TABLE absensi_terapis"
+          await cursor.execute(q1)
+
+          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Dibersihkan"}, status_code=200)
+        except aiomysqlerror as e:
+          # Rollback Input Jika Error
+
+          # Ambil Error code
+          error_code = e.args[0] if e.args else "Unknown"
+          
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+        
+        except Exception as e:
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)

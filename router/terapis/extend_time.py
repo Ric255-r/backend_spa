@@ -34,7 +34,7 @@ async def getdatalocker(
         q1 = """
           SELECT dtp.*, pm.nama_paket_msg, pm.harga_paket_msg AS hrg_item FROM detail_transaksi_paket dtp 
           INNER JOIN paket_massage pm ON dtp.id_paket = pm.id_paket_msg
-          WHERE dtp.id_transaksi = %s
+          WHERE dtp.id_transaksi = %s AND dtp.is_returned != 1
         """
         await cursor.execute(q1, (id_trans, ))  
 
@@ -89,8 +89,11 @@ async def save_addon(
             new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
             durasi_tambahan += item['extended_duration']
             
-            qty = int(item['extended_duration']) / int(item['durasi_awal'])
-            harga_total = qty * item['harga_item']
+            # qty = int(item['extended_duration']) / int(item['durasi_awal'])
+            # harga_total = qty * item['harga_item']
+
+            qty = item['qty']
+            harga_total = item['harga_total']
             total_addon += harga_total
 
             q1 = """
@@ -110,8 +113,11 @@ async def save_addon(
             new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
             durasi_tambahan += item['extended_duration']
 
-            qty = int(item['extended_duration']) / int(item['durasi_awal'])
-            harga_total = qty * item['harga_item']
+            # qty = int(item['extended_duration']) / int(item['durasi_awal'])
+            # harga_total = qty * item['harga_item']
+            # total_addon += harga_total
+            qty = item['qty']
+            harga_total = item['harga_total']
             total_addon += harga_total
 
             q2 = """

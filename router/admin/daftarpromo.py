@@ -178,11 +178,11 @@ async def postpromokunjungan(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO promo(kode_promo,nama_promo,kode_detail_promo) VALUES(%s, %s, %s)"
+          q1 = "INSERT INTO promo(kode_promo,nama_promo,detail_kode_promo) VALUES(%s, %s, %s)"
           await cursor.execute(q1, (data['kode_promo'],data['nama_promo'],lastiddetailpromo))
 
-          q2 = "INSERT INTO detail_promo_kunjungan(detail_kode_promo,limit_kunjungan,harga_promo) VALUES(%s,%s,%s)"
-          await cursor.execute(q2, (lastiddetailpromo,data['limit_kunjungan'],data['harga_promo']))
+          q2 = "INSERT INTO detail_promo_kunjungan(detail_kode_promo,limit_kunjungan,limit_promo,durasi,discount,harga_promo) VALUES(%s,%s,%s,%s,%s,%s)"
+          await cursor.execute(q2, (lastiddetailpromo,data['limit_kunjungan'],data['limit_promo'],data['durasi'],data['discount'],data['harga_promo']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
