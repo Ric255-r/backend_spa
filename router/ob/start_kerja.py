@@ -179,7 +179,7 @@ async def updateLaporan(
           # End Bagian Delete
 
           # Ksh Delay Dikit 
-          await asyncio.sleep(0.5)
+          await asyncio.sleep(0.2)
 
           #  1. Start Transaction
           await conn.begin()
@@ -250,7 +250,7 @@ async def storeWaktu(
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
-          return "Sukses Store Data"
+          return "Sukses Delete Data"
         except aiomysqlerror as e:
           # Rollback Input Jika Error
 

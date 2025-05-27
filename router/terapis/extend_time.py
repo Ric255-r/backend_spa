@@ -135,17 +135,25 @@ async def save_addon(
 
           # Select kode maintransaksi utk update addon
           q3 = """
-            SELECT total_addon FROM main_transaksi WHERE id_transaksi = %s
+            SELECT total_addon, jenis_pembayaran, disc FROM main_transaksi WHERE id_transaksi = %s
           """
           await cursor.execute(q3, (id_main, ))  
 
           itemsTrans = await cursor.fetchone()
           addon_awal = itemsTrans[0]
+          jenis_pembayaran_main = itemsTrans[1]
+          disc_main = itemsTrans[2]
+
+          # diskonkan kalo dia payment di akhir. 
+          if jenis_pembayaran_main == 1:
+            disc_nominal_addon = total_addon * disc_main
+            total_addon -= disc_nominal_addon
+          # end Diskon
 
           q4 = """
             UPDATE main_transaksi SET total_addon = %s WHERE id_transaksi = %s
           """
-          await cursor.execute(q4, (total_addon + addon_awal, id_main))  
+          await cursor.execute(q4, (addon_awal + total_addon, id_main))  
           await conn.commit()
 
           # Select durasi_kerja_sementara utk dapetin sum_durasi_menit yg tersimpan
