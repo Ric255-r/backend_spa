@@ -22,7 +22,7 @@ async def getkomisipaket(
 
         data = await request.json()
 
-        q1 = "SELECT tipe_komisi, nominal_komisi,harga_paket_msg FROM paket_massage WHERE nama_paket_msg = %s"
+        q1 = "SELECT tipe_komisi, nominal_komisi, tipe_komisi_gro, nominal_komisi_gro,harga_paket_msg FROM paket_massage WHERE nama_paket_msg = %s"
         await cursor.execute(q1,(data['nama_paket'],))
 
         items = await cursor.fetchall()
@@ -132,6 +132,34 @@ async def getidpaket(
   except Exception as e:
     return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
 
+@app.get('/getidgro')
+async def getidpaket(
+  request: Request
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        data = await request.json()
+
+        q1 = "SELECT id_gro FROM main_transaksi WHERE id_transaksi = %s"
+        await cursor.execute(q1,(data['id_transaksi']))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
+
 @app.get('/getqtypaket')
 async def getqtypaket(
   request: Request
@@ -177,7 +205,7 @@ async def getkomisiproduk(
 
         data = await request.json()
 
-        q1 = "SELECT tipe_komisi, nominal_komisi, harga_produk FROM menu_produk WHERE nama_produk = %s"
+        q1 = "SELECT tipe_komisi, nominal_komisi, tipe_komisi_gro, nominal_komisi_gro, harga_produk FROM menu_produk WHERE nama_produk = %s"
         await cursor.execute(q1,(data['nama_produk'],))
 
         items = await cursor.fetchall()

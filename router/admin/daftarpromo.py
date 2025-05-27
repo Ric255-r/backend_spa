@@ -120,7 +120,7 @@ async def getidpromo() :
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         # await cursor.execute("COMMIT;")
 
-        q1 = "SELECT kode_promo FROM promo ORDER BY kode_promo DESC"
+        q1 = "SELECT kode_promo,nama_promo FROM promo ORDER BY kode_promo DESC"
 
         await cursor.execute(q1)
 
