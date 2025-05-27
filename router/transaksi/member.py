@@ -124,7 +124,7 @@ async def storeData(
           new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
 
           q2 = """
-              INSERT INTO detail_transaksi_fasilitas(
+              INSERT INTO detail_transaksi_member(
                 id_detail_transaksi, id_transaksi, id_fasilitas, qty, satuan, harga, status
               ) 
               VALUES(
