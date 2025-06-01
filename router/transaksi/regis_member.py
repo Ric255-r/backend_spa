@@ -37,7 +37,7 @@ async def postMember(
                     await conn.begin()
 
                     # 2. Generate id_member
-                    id_member = await generate_id_member(status, cursor)
+                    id_member = await generate_id_member_from_cursor(status, cursor)
 
                     # 3. Save QR Code Image
                     qr_folder = "qrcodes"
@@ -55,7 +55,12 @@ async def postMember(
                     await conn.commit()
                     await asyncio.sleep(0.2)
 
-                    return JSONResponse(content={"status": "Success", "message": f"Data Berhasil Diinput dengan ID {id_member}"}, status_code=200)
+                    return JSONResponse(content={
+    "status": "Success",
+    "message": f"Data Berhasil Diinput dengan ID {id_member}",
+    "id_member": id_member  # ✅ This allows frontend to read it
+}, status_code=200)
+
 
                 except aiomysql.Error as e:
                     await conn.rollback()
@@ -68,23 +73,30 @@ async def postMember(
     except Exception as e:
         return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
-@app.get('/id_member')
-async def generate_id_member(status, cursor):
-  try:
+async def generate_id_member_from_cursor(status: str, cursor) -> str:
     prefix = "MM" if status == "Member" else "MV"
+    await cursor.execute(f"SELECT id_member FROM member WHERE id_member LIKE '{prefix}%'")
+    rows = await cursor.fetchall()
 
-    # Get the last id_member from the database
-    await cursor.execute(f"SELECT id_member FROM member WHERE id_member LIKE '{prefix}%' ORDER BY id_member DESC LIMIT 1")
-    last_id = await cursor.fetchone()
-
-    if last_id:
-        last_number = int(re.search(r'\d+', last_id[0]).group())  # Extract number from ID
-        new_number = last_number + 1
+    if rows:
+        numbers = [int(re.search(r'\d+', row[0]).group()) for row in rows if re.search(r'\d+', row[0])]
+        new_number = max(numbers) + 1
     else:
-        new_number = 1  # Start from 001 if no previous entry
+        new_number = 1
 
-    return f"{prefix}{new_number:03d}"  # Format as MM001 or MV001
+    return f"{prefix}{new_number:03d}"
 
+@app.get('/id_member')
+async def generate_id_member(status: str, db=Depends(get_db)):
+    try:
+        async with db.cursor() as cursor:
+            id_member = await generate_id_member_from_cursor(status, cursor)
 
-  except Exception as e:
-    return JSONResponse({"Error Get Id_member": str(e)}, status_code=500)
+        return JSONResponse(content={
+            "status": "Success",
+            "id_member": id_member,
+            "message": f"ID Member {id_member} berhasil dibuat"
+        }, status_code=200)
+
+    except Exception as e:
+        return JSONResponse(content={"status": "Error", "message": f"Error Get id_member: {str(e)}"}, status_code=500)

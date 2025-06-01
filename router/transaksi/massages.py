@@ -1,5 +1,6 @@
 import asyncio
 import json
+import traceback
 from typing import Optional
 import uuid
 from fastapi import APIRouter, Query, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
@@ -241,6 +242,7 @@ async def storeData(
           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
   except Exception as e:
+    error_details = traceback.format_exc()
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
 
