@@ -128,6 +128,12 @@ async def updateDataDraft(
             """
 
             await cursor.execute(q1,(data['no_loker'], data['jenis_tamu'], id))
+          elif "mode" in data and data['mode'] == "for_member" :
+            q1 = """
+              UPDATE main_transaksi SET jenis_tamu = %s WHERE id_transaksi = %s AND status = 'draft'
+            """
+
+            await cursor.execute(q1,(data['jenis_tamu'], id))
           else:
             q1 = """
               UPDATE main_transaksi SET jenis_tamu = %s, no_hp = %s, nama_tamu = %s WHERE id_transaksi = %s AND status = 'draft'

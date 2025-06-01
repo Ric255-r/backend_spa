@@ -185,6 +185,17 @@ async def get_detail(
           await cursor.execute(q_fasilitas, (id_trans, ))
           fasilitas_item = await cursor.fetchall()
 
+          q_member = """
+            SELECT dtm.*, p.nama_promo
+            FROM detail_transaksi_member dtm
+            LEFT JOIN promo p ON dtm.kode_promo = p.kode_promo
+            WHERE dtm.id_transaksi = %s
+            ORDER BY dtm.id_transaksi
+          """
+          await cursor.execute(q_member, (id_trans, ))
+          member_item = await cursor.fetchall()
+          print("member_item results:", member_item)
+
           # proses field product
           product_ori = [item for item in product_items if item['is_addon'] == 0]
           product_addon = []
@@ -212,11 +223,15 @@ async def get_detail(
           # proses field fasilitas
           fasilitas_ori = [item for item in fasilitas_item]
 
+          #proses field member
+          member_ori = [item for item in member_item]
+
           return {
             "detail_produk": product_ori,
             "detail_paket": paket_ori,
             "detail_food": food_ori,
             "detail_fasilitas": fasilitas_ori,
+            "detail_member": member_ori,
             # satuin semua listnya
             "all_addon": product_addon + paket_addon + food_addon 
           }

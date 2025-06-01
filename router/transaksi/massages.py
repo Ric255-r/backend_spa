@@ -1,5 +1,6 @@
 import asyncio
 import json
+import traceback
 from typing import Optional
 import uuid
 from fastapi import APIRouter, Query, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
@@ -146,7 +147,53 @@ async def storeData(
                 new_id_dt, data['id_transaksi'], item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
                 item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], status_trans, item['is_addon']
               ))
+              if item['harga_paket_msg'] == 0:
 
+                q_check = """
+                    SELECT dtm.id_member, dtm.kode_promo
+                    FROM detail_transaksi_member dtm
+                    JOIN promo p ON dtm.kode_promo = p.kode_promo
+                    JOIN detail_promo_kunjungan dpk ON dpk.detail_kode_promo = p.detail_kode_promo
+                    WHERE dtm.id_member = %s AND p.detail_kode_promo LIKE 'DK%%' AND dtm.sisa_kunjungan > 0
+                    LIMIT 1
+                """
+
+                # Only run promo deduction logic if harga_paket_msg == 0 AND id_member is provided
+            id_member = data.get('id_member')
+
+            if item['harga_paket_msg'] == 0 and id_member and id_member.strip() != "":
+                q_check = """
+                    SELECT dtm.id_member, dtm.kode_promo
+                    FROM detail_transaksi_member dtm
+                    JOIN promo p ON dtm.kode_promo = p.kode_promo
+                    JOIN detail_promo_kunjungan dpk ON dpk.detail_kode_promo = p.detail_kode_promo
+                    WHERE dtm.id_member = %s AND p.detail_kode_promo LIKE 'DK%%' AND dtm.sisa_kunjungan > 0
+                    LIMIT 1
+                """
+                await cursor.execute(q_check, (id_member,))
+                result_check = await cursor.fetchone()
+                print("Promo check result:", result_check)
+
+                if result_check:
+                    id_member_kunjungan, kode_promo_kunjungan = result_check
+                    qty = item['jlh']  # quantity to decrement
+                    print(f"Decrementing sisa_kunjungan by {qty} for member {id_member_kunjungan}, promo {kode_promo_kunjungan}")
+                    
+                    q_update = """
+                        UPDATE detail_transaksi_member
+                        SET sisa_kunjungan = CASE
+                            WHEN sisa_kunjungan >= %s THEN sisa_kunjungan - %s
+                            WHEN sisa_kunjungan > 0 THEN 0
+                            ELSE 0
+                        END
+                        WHERE id_member = %s AND kode_promo = %s;
+                    """
+                    await cursor.execute(q_update, (qty, qty, id_member_kunjungan, kode_promo_kunjungan))
+
+
+                print("About to commit transaction")
+                await conn.commit()
+                
           # false = awal
           if jenis_pembayaran == False:
             #Query Masukin ke Transaksi
@@ -154,13 +201,13 @@ async def storeData(
               q3 = """
                 UPDATE main_transaksi
                 SET
-                  jenis_transaksi = %s, total_harga = %s, disc = %s, 
+                  jenis_transaksi = %s, id_member = %s, total_harga = %s, disc = %s, 
                   grand_total = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
                   nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'massage', data['total_harga'], data['disc'], 
+                'massage', data['id_member'], data['total_harga'], data['disc'], 
                 data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
                 data['nama_bank'], data['jumlah_bayar'], 0, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -170,13 +217,13 @@ async def storeData(
               q3 = """
                 UPDATE main_transaksi
                 SET
-                  jenis_transaksi = %s, total_harga = %s, disc = %s, 
+                  jenis_transaksi = %s, id_member = %s, total_harga = %s, disc = %s, 
                   grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
                   jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'massage', data['total_harga'], data['disc'], 
+                'massage', data['id_member'], data['total_harga'], data['disc'], 
                 data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
                 data['jumlah_bayar'] - data['grand_total'], jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -214,17 +261,6 @@ async def storeData(
           # Klo Sukses, dia bkl save ke db
           await conn.commit()
 
-          # Ini utk aktifkan websocket kirim ke admin
-          # for ws_con in kitchen_connection:
-          #   await ws_con.send_text(
-          #     json.dumps({
-          #       "id_transaksi": data['id_transaksi'],
-          #       "status": "PENDING",
-          #       "message": "Ada Order Baru"
-          #     })
-          #   )
-
-
           return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
         except aiomysqlerror as e:
           # Rollback Input Jika Error
@@ -241,6 +277,7 @@ async def storeData(
           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
   except Exception as e:
+    error_details = traceback.format_exc()
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
 
