@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, Query, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -38,7 +39,8 @@ async def getPaket():
     p.kode_promo,
     p.nama_promo,
     d.limit_kunjungan,
-    d.harga_promo
+    d.harga_promo,
+    d.limit_promo
     FROM promo p
     JOIN detail_promo_kunjungan d
     ON p.detail_kode_promo = d.detail_kode_promo
@@ -94,7 +96,7 @@ WHERE p.detail_kode_promo LIKE 'DT%'
   except Exception as e:
     return JSONResponse({"Error Get Paket Tahunan": str(e)}, status_code=500)
   
-@app.post('/store')
+@app.post('/storekunjungan')
 async def storeData(request: Request):
     try:
         pool = await get_db()
@@ -115,12 +117,12 @@ async def storeData(request: Request):
                     q2 = """
                         INSERT INTO detail_transaksi_member(
                             id_detail_transaksi, id_transaksi, id_member, 
-                            kode_promo, harga_promo, status
-                        ) VALUES(%s, %s, %s, %s, %s, 'paid')
+                            kode_promo, harga_promo, status, sisa_kunjungan, exp_kunjungan
+                        ) VALUES(%s, %s, %s, %s, %s, 'paid', %s, %s)
                     """
                     await cursor.execute(q2, (
                         new_id_dt, data['id_transaksi'], data['id_member'],
-                        data['kode_promo'], data['harga']
+                        data['kode_promo'], data['harga'], data['limit_kunjungan'], data['exp_kunjungan']
                     ))
                     
                     # Update main_transaksi - always payment now ("awal")
@@ -171,15 +173,7 @@ async def storeData(request: Request):
                             status = %(status)s
                         WHERE id_transaksi = %(id_transaksi)s
                     """
-
                     await cursor.execute(q3, q3_values)
-
-                    q4 = """
-                        UPDATE member SET
-                        sisa_kunjungan = %s
-                        WHERE id_member = %s
-                    """
-                    await cursor.execute(q4, (data['limit_kunjungan'], data['id_member']))
                     
                     await conn.commit()
                     return {"status": "Success", "message": "Payment processed successfully"}
@@ -192,3 +186,87 @@ async def storeData(request: Request):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+@app.post('/storetahunan')
+async def store_tahunan(request: Request):
+    try:
+        pool = await get_db()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await conn.begin()
+                data = await request.json()
+
+                # Validate required fields
+                required = ['id_member', 'id_transaksi', 'kode_promo', 'harga']
+                for field in required:
+                    if field not in data:
+                        raise HTTPException(status_code=400, detail=f"Missing field: {field}")
+
+                try:
+                    # Insert promo tahunan logic
+                    new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
+                    q_insert = """
+                        INSERT INTO detail_transaksi_member(
+                            id_detail_transaksi, id_transaksi, id_member, 
+                            kode_promo, harga_promo, status, exp_tahunan
+                        ) VALUES(%s, %s, %s, %s, %s, 'paid', %s)
+                    """
+                    await cursor.execute(q_insert, (
+                        new_id_dt, data['id_transaksi'], data['id_member'],
+                        data['kode_promo'], data['harga'], data['exp_tahunan']
+                    ))
+
+                    # Update transaction info
+                    q_update = """
+                        UPDATE main_transaksi SET
+                            jenis_transaksi = 'member',
+                            id_member = %(id_member)s,
+                            no_hp = %(no_hp)s,
+                            nama_tamu = %(nama_tamu)s,
+                            total_harga = %(total_harga)s,
+                            disc = 0,
+                            grand_total = %(grand_total)s,
+                            metode_pembayaran = %(metode_pembayaran)s,
+                            jumlah_bayar = %(jumlah_bayar)s,
+                            jumlah_kembalian = %(jumlah_kembalian)s,
+                            jenis_pembayaran = FALSE,
+                            status = 'paid'
+                        WHERE id_transaksi = %(id_transaksi)s
+                    """
+                    q_values = {
+                        'id_member': data['id_member'],
+                        'no_hp': data['no_hp'],
+                        'nama_tamu': data['nama_tamu'],
+                        'total_harga': data['harga'],
+                        'grand_total': data['harga'],
+                        'metode_pembayaran': data.get('metode_pembayaran', 'cash'),
+                        'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
+                        'jumlah_kembalian': data.get('jumlah_bayar', 0) - data['harga'],
+                        'id_transaksi': data['id_transaksi']
+                    }
+                    await cursor.execute(q_update, q_values)
+
+                    await conn.commit()
+                    return {"status": "Success", "message": "Tahunan promo applied"}
+                except Exception as e:
+                    await conn.rollback()
+                    raise HTTPException(status_code=500, detail=f"DB error: {str(e)}")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
+@app.get("/checkpromo")
+async def check_promo(id_member: str):
+    try:
+        pool = await get_db()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("""
+                    SELECT * FROM detail_transaksi_member
+                    WHERE id_member = %s AND exp_tahunan >= CURDATE()
+                """, (id_member,))
+                result = await cursor.fetchone()
+                return {"has_promo": result is not None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

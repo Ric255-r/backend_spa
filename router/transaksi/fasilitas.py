@@ -94,13 +94,13 @@ async def storeData(
               q3 = """
                 UPDATE main_transaksi
                 SET
-                  jenis_transaksi = %s, total_harga = %s, disc = %s, 
+                  jenis_transaksi = %s, id_member = %s, no_hp = %s, nama_tamu = %s, total_harga = %s, disc = %s, 
                   grand_total = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
                   nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'Fasilitas', data['total_harga'], 0, 
+                'Fasilitas', data.get('id_member'), data['no_hp'], data['nama_tamu'], data['total_harga'], 0, 
                 data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
                 data['nama_bank'], data['jumlah_bayar'], 0, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -110,13 +110,13 @@ async def storeData(
               q3 = """
                 UPDATE main_transaksi
                 SET
-                  jenis_transaksi = %s, total_harga = %s, disc = %s, 
+                  jenis_transaksi = %s, id_member = %s, no_hp = %s, nama_tamu = %s, total_harga = %s, disc = %s, 
                   grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
                   jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'fasilitas', data['total_harga'], 0, 
+                'fasilitas', data.get('id_member') or '', data.get('no_hp') or '0', data['nama_tamu'], data['total_harga'], 0, 
                 data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
                 data['jumlah_bayar'] - data['grand_total'], jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE

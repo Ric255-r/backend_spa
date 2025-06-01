@@ -85,7 +85,7 @@ async def postpromohappyhour(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO promo(kode_promo,nama_promo,kode_detail_promo) VALUES(%s, %s, %s)"
+          q1 = "INSERT INTO promo(kode_promo,nama_promo,detail_kode_promo) VALUES(%s, %s, %s)"
           await cursor.execute(q1, (data['kode_promo'],data['nama_promo'],lastiddetailpromo))
 
           q2 = "INSERT INTO detail_promo_happyhour(detail_kode_promo,senin,selasa,rabu,kamis,jumat,sabtu,minggu,jam_mulai,jam_selesai,disc,member,vip) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
@@ -247,7 +247,7 @@ async def postpromotahunan(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO promo(kode_promo,nama_promo,kode_detail_promo) VALUES(%s, %s, %s)"
+          q1 = "INSERT INTO promo(kode_promo,nama_promo,detail_kode_promo) VALUES(%s, %s, %s)"
           await cursor.execute(q1, (data['kode_promo'],data['nama_promo'],lastiddetailpromotahunan))
 
           q2 = "INSERT INTO detail_promo_tahunan(detail_kode_promo,jangka_tahun,harga_promo) VALUES(%s,%s,%s)"
