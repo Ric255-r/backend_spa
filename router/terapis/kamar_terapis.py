@@ -1,8 +1,9 @@
 from datetime import datetime
+import json
 from typing import Optional
 import uuid
 import aiomysql
-from fastapi import APIRouter, File, Form, Query, Request, HTTPException, Security, UploadFile
+from fastapi import APIRouter, File, Form, Query, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
 from fastapi_jwt import (
@@ -15,6 +16,7 @@ from aiomysql import Error as aiomysqlerror
 from jwt_auth import access_security, refresh_security
 from datetime import timedelta
 import traceback
+import asyncio
 
 app = APIRouter(
   prefix="/kamar_terapis"
@@ -654,8 +656,44 @@ async def returPaket(
   except Exception as e:
     error_details = traceback.format_exc()
     return JSONResponse(content={"status": "error", "message": f"Koneksi Error {error_details}"}, status_code=500)
+
+ob_connections = []
+
+@app.websocket("/ws-ob")
+async def spv_ob(
+  websocket : WebSocket
+) :
+  await websocket.accept()
+  ob_connections.append(websocket)
+  try :
+    print('Hai ws ob nyala')
+    while True :
+      message = await websocket.receive_text()
+      print(f"received : {message}")
+  except WebSocketDisconnect :
+    print("websocket disconnected, removing from list")
+    ob_connections.remove(websocket)
   
-  
+  except Exception as e :
+    print(f"unexpected websocket error : {e}")
+    ob_connections.remove(websocket)
+
+async def broadcast_update():
+
+  pool = await get_db()
+  async with pool.acquire() as conn:
+    async with conn.cursor() as cursor:
+      q1 = "SELECT nama_ruangan FROM kerja_ob_sementara ORDER BY id ASC"
+      await cursor.execute(q1)
+      result = await cursor.fetchall()
+
+  for websocket in ob_connections:
+    await websocket.send_text(
+      json.dumps({
+        "nama_ruangan": [row[0] for row in result],
+                })
+  ) 
+
 @app.put('/selesai')
 async def selesai(
   request: Request,
@@ -723,7 +761,20 @@ async def selesai(
           q5 = "DELETE FROM durasi_kerja_sementara WHERE id_transaksi = %s"
           await cursor.execute(q5, (data['id_transaksi'], ))
 
-          await conn.commit()
+          q6 = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(q6, id_ruangan)
+
+          item6 = await cursor.fetchone()
+
+          namaruangan = item6[0]
+          print(namaruangan)
+
+          q7 = "INSERT INTO kerja_ob_sementara (nama_ruangan) VALUES (%s) "
+          await cursor.execute(q7, namaruangan)
+
+          await conn.commit() 
+
+          await broadcast_update()
 
           print("Berhasil Eksekusi Semua Fungsi diatas")
         except HTTPException as e:
