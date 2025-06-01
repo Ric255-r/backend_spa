@@ -267,6 +267,67 @@ async def storeWaktu(
   except Exception as e:
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
+@app.get('/ruanganbersihkan')
+async def getMenu():
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+
+        q1 = "SELECT nama_ruangan FROM kerja_ob_sementara"
+        await cursor.execute(q1)
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Ruangan endpoint /list_room ": str(e)}, status_code=500)
+  
+@app.delete('/confirmkerjaanob')
+async def deletefnb(
+  request: Request
+):
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # 1. Start Transaction
+          await conn.begin()
+
+          # 2. Execute querynya
+          data = await request.json()
+          q1 = "DELETE FROM kerja_ob_sementara WHERE nama_ruangan = %s"
+          await cursor.execute(q1, (data['nama_ruangan']))
+          # 3. Klo Sukses, dia bkl save ke db
+          await conn.commit()
+
+          return "succes"
+        except aiomysqlerror.MySQLError as e:
+          # Rollback Input Jika Error
+
+          # Ambil Error code
+          error_code = e.args[0] if e.args else "Unknown"
+          
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+        
+        except Exception as e:
+          await conn.rollback()
+          print(f"Error during insert : {e}")
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
   
 
