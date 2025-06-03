@@ -850,7 +850,7 @@ async def delete_waktu(
           q4 = "UPDATE karyawan SET is_occupied = FALSE WHERE id_karyawan = %s"
           await cursor.execute(q4, (id_terapis, ))
 
-          q5 = "UPDATE ruangan SET status = 'aktif' WHERE id_ruangan = %s"
+          q5 = "UPDATE ruangan SET status = 'maintenance' WHERE id_ruangan = %s"
           await cursor.execute(q5, (id_ruangan, ))
 
           await conn.commit()
