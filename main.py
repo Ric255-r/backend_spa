@@ -1,5 +1,7 @@
+import os
 from fastapi import Depends, FastAPI, APIRouter, Security, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi_jwt import JwtAuthorizationCredentials
 from router.routeTest import app as app_test
 from router.user.login import app as app_login
@@ -49,8 +51,11 @@ from router.komisi.komisi import app as app_komisi
 from jwt_auth import access_security
 
 from koneksi import lifespan
-
+IMAGEDIR = "assets/ob"
+if not os.path.exists(IMAGEDIR):
+    os.makedirs(IMAGEDIR)
 app = FastAPI(lifespan=lifespan)
+app.mount("/api/images", StaticFiles(directory=IMAGEDIR), name="images")
 
 app.add_middleware(
   CORSMiddleware,
@@ -117,4 +122,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="10.10.10.183", port=5500)
+  uvicorn.run(app, host="192.168.1.3", port=5500)

@@ -4,6 +4,7 @@ import uuid
 from fastapi import APIRouter, Depends, File, Form, Query, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
+from fastapi.staticfiles import StaticFiles
 from fastapi_jwt import (
   JwtAccessBearerCookie,
   JwtAuthorizationCredentials,
@@ -16,11 +17,14 @@ import os
 import asyncio
 
 IMAGEDIR = "assets/ob"
+if not os.path.exists(IMAGEDIR):
+    os.makedirs(IMAGEDIR)
 
 app = APIRouter(
   prefix="/ob",
   # dependencies=[Depends(verify_jwt)]
 )
+
 
 @app.get('/list_room')
 async def getMenu():
