@@ -1,6 +1,8 @@
 from datetime import datetime
+import json
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, File, Form, Query, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -13,6 +15,7 @@ import pandas as pd
 from aiomysql import Error as aiomysqlerror
 from jwt_auth import access_security, refresh_security
 from datetime import timedelta
+from router.terapis.kamar_terapis import kamar_connection
 
 app = APIRouter(
   prefix="/revisi"
@@ -53,7 +56,7 @@ async def updateTerapis(
     pool = await get_db() # Get The pool
 
     async with pool.acquire() as conn:  # Auto Release
-      async with conn.cursor() as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
         try:
           await conn.begin()
 
@@ -75,6 +78,28 @@ async def updateTerapis(
 
           await conn.commit()
 
+          qSelectMain = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectMain, (id_transaksi, ))
+          item_main = await cursor.fetchone()
+
+          qSelectTerapis = "SELECT * FROM karyawan WHERE id_karyawan = %s"
+          await cursor.execute(qSelectTerapis, (item_main['id_terapis'], ))
+          item_terapis = await cursor.fetchone()
+
+          qSelectRuangan = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(qSelectRuangan, (item_main['id_ruangan'], ))
+          item_ruangan = await cursor.fetchone()
+
+          # Ini utk aktifkan websocket kirim ke admin
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": id_transaksi,
+                "status": "ganti_terapis",
+                "message": f"Ruangan {item_ruangan['nama_ruangan']} Mengganti Terapis ke {item_terapis['nama_karyawan']}"
+              })
+            )
+
         except aiomysqlerror as e:
           await conn.rollback()
           return JSONResponse(content={"Error Mysql": str(e)}, status_code=500)
@@ -94,7 +119,7 @@ async def updateRuangan(
     pool = await get_db() # Get The pool
 
     async with pool.acquire() as conn:  # Auto Release
-      async with conn.cursor() as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
         try:
           await conn.begin()
 
@@ -108,7 +133,7 @@ async def updateRuangan(
           items = await cursor.fetchone()
 
           q1 = "UPDATE main_transaksi SET id_ruangan = %s, sedang_dikerjakan = 0 WHERE id_transaksi = %s"
-          await cursor.execute(q1, (items[0], id_transaksi))
+          await cursor.execute(q1, (items['id_ruangan'], id_transaksi))
 
           q2 = "UPDATE terapis_kerja SET is_tunda = 1 WHERE id_transaksi = %s"
           await cursor.execute(q2, (id_transaksi))

@@ -22,6 +22,23 @@ app = APIRouter(
   prefix="/kamar_terapis"
 )
 
+kamar_connection = []
+
+@app.websocket("/ws-kamar")
+async def kamar_ws(
+  websocket: WebSocket
+):
+  await websocket.accept()
+  kamar_connection.append(websocket)
+  try:
+    # Bikin Koneksi Ttp Nyala
+    print("Hai Ws Kamar")
+    await websocket.receive_text()
+
+  except WebSocketDisconnect :
+    print("ws kamar closed")
+    kamar_connection.remove(websocket)
+
 # Bagian OB
 @app.get('/data_ob')
 async def getData():
@@ -151,7 +168,7 @@ async def getLatestTrans(
             dtpa.total_durasi, pm.detail_paket as deskripsi_paket, m.id_transaksi,
             m.created_at as tgl_transaksi, m.id_terapis, dtpa.id_detail_transaksi,
             k.nama_karyawan, r.nama_ruangan, r.id_karyawan AS kode_ruangan, dtpa.status AS status_detail,
-            dtpa.is_addon
+            dtpa.is_addon, dtpa.harga_total
             FROM detail_transaksi_paket dtpa 
             INNER JOIN main_transaksi m ON dtpa.id_transaksi = m.id_transaksi
             INNER JOIN karyawan k ON m.id_terapis = k.id_karyawan
@@ -604,6 +621,7 @@ async def returPaket(
           disc_awal = items['disc']
           jumlah_byr_awal = items['jumlah_bayar']
           status_awal = items['status']
+          id_ruangan = items['id_ruangan']
           # End Bagian Tarik Data Main
 
           # Tarik Data yg diretur
@@ -612,6 +630,24 @@ async def returPaket(
           items2 = await cursor.fetchone()
           harga_retur = items2['harga_total']
           retur_durasi = items2['total_durasi']
+
+          qSelectPaket = "SELECT * FROM paket_massage WHERE id_paket_msg = %s"
+          await cursor.execute(qSelectPaket, (id_pengganti, ))
+          item_paket = await cursor.fetchone()
+
+          qSelectRuangan = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(qSelectRuangan, (id_ruangan, ))
+          item_ruangan = await cursor.fetchone()
+
+          # Ini utk aktifkan websocket kirim ke admin
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": id_transaksi,
+                "status": "ganti_paket",
+                "message": f"Ruangan {item_ruangan['nama_ruangan']} Mengganti Paket ke {item_paket['nama_paket_msg']}"
+              })
+            )
           # End Tarik data Yg diretur
 
           # Update main Transaksi

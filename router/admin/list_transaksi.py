@@ -25,6 +25,7 @@ async def check_struk(id_trans: str):
       async with conn.cursor(aiomysql.DictCursor) as cursor:
         
         # Query ini cek apakah dia pertamakali beli atau bkn
+        # Member = pertamakali beli
         await cursor.execute("""
           SELECT * FROM main_transaksi WHERE jenis_transaksi = 'member' and id_transaksi = %s
         """, (id_trans, ))
