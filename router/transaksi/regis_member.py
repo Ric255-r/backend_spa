@@ -56,10 +56,10 @@ async def postMember(
                     await asyncio.sleep(0.2)
 
                     return JSONResponse(content={
-    "status": "Success",
-    "message": f"Data Berhasil Diinput dengan ID {id_member}",
-    "id_member": id_member  # ✅ This allows frontend to read it
-}, status_code=200)
+                    "status": "Success",
+                    "message": f"Data Berhasil Diinput dengan ID {id_member}",
+                    "id_member": id_member  # ✅ This allows frontend to read it
+                }, status_code=200)
 
 
                 except aiomysql.Error as e:

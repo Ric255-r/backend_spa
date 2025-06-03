@@ -16,6 +16,44 @@ app = APIRouter(
   prefix="/listtrans",
 )
 
+# Buat Cek di struk
+@app.get("/cek_struk_member")
+async def check_struk(id_trans: str):
+  try:
+    pool = await get_db()
+    async with pool.acquire() as conn:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        
+        # Query ini cek apakah dia pertamakali beli atau bkn
+        await cursor.execute("""
+          SELECT * FROM main_transaksi WHERE jenis_transaksi = 'member' and id_transaksi = %s
+        """, (id_trans, ))
+        result = await cursor.fetchone()
+
+        q1 = """
+          SELECT * FROM main_transaksi WHERE id_transaksi = %s
+        """
+        await cursor.execute(q1, (id_trans, ))
+        result1 = await cursor.fetchone()
+
+        q2 = """
+          SELECT dtm.*, p.nama_promo, m.nama as nama_member, m.no_hp 
+          FROM detail_transaksi_member dtm
+          INNER JOIN member m ON dtm.id_member = m.id_member
+          INNER JOIN promo p ON dtm.kode_promo = p.kode_promo
+          WHERE dtm.id_member = %s
+        """
+        await cursor.execute(q2, (result1['id_member'], ))
+        result2 = await cursor.fetchall()
+
+        return {
+          "first_time_buy": result is not None, 
+          "detail_member": result2 if result2 else []
+        }
+      
+  except Exception as e:
+      raise HTTPException(status_code=500, detail=str(e))
+  
 @app.get('/datatrans')
 async def getDataTrans(
   hak_akses: Optional[str] = Query(None)
@@ -185,6 +223,19 @@ async def get_detail(
           await cursor.execute(q_fasilitas, (id_trans, ))
           fasilitas_item = await cursor.fetchall()
 
+          q_member = """
+            SELECT dtm.*, p.nama_promo, m.nama, m.status as status_member, 
+            m.no_hp
+            FROM detail_transaksi_member dtm
+            LEFT JOIN promo p ON dtm.kode_promo = p.kode_promo
+            LEFT JOIN member m ON dtm.id_member = m.id_member
+            WHERE dtm.id_transaksi = %s
+            ORDER BY dtm.id_transaksi
+          """
+          await cursor.execute(q_member, (id_trans, ))
+          member_item = await cursor.fetchall()
+          print("member_item results:", member_item)
+
           # proses field product
           product_ori = [item for item in product_items if item['is_addon'] == 0]
           product_addon = []
@@ -212,11 +263,15 @@ async def get_detail(
           # proses field fasilitas
           fasilitas_ori = [item for item in fasilitas_item]
 
+          #proses field member
+          member_ori = [item for item in member_item]
+
           return {
             "detail_produk": product_ori,
             "detail_paket": paket_ori,
             "detail_food": food_ori,
             "detail_fasilitas": fasilitas_ori,
+            "detail_member": member_ori,
             # satuin semua listnya
             "all_addon": product_addon + paket_addon + food_addon 
           }
