@@ -1,6 +1,8 @@
 from datetime import datetime
+import json
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, File, Form, Query, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -13,6 +15,7 @@ import pandas as pd
 from aiomysql import Error as aiomysqlerror
 from jwt_auth import access_security, refresh_security
 from datetime import timedelta
+from router.terapis.kamar_terapis import kamar_connection
 
 
 app = APIRouter(
@@ -73,7 +76,7 @@ async def save_addon(
     pool = await get_db()
 
     async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
         try:
           await conn.begin()
 
@@ -140,9 +143,9 @@ async def save_addon(
           await cursor.execute(q3, (id_main, ))  
 
           itemsTrans = await cursor.fetchone()
-          addon_awal = itemsTrans[0]
-          jenis_pembayaran_main = itemsTrans[1]
-          disc_main = itemsTrans[2]
+          addon_awal = itemsTrans['total_addon']
+          jenis_pembayaran_main = itemsTrans['jenis_pembayaran']
+          disc_main = itemsTrans['disc']
 
           # diskonkan kalo dia payment di akhir. 
           if jenis_pembayaran_main == 1:
@@ -163,7 +166,7 @@ async def save_addon(
           await cursor.execute(q5, (id_main, ))  
 
           itemsDurasi = await cursor.fetchone()
-          savedDurasi = itemsDurasi[0]
+          savedDurasi = itemsDurasi['sum_durasi_menit']
 
           # Baru update, dgn kalkulasi menit yg lama dgn yg di extend
           q6 = """
@@ -171,6 +174,26 @@ async def save_addon(
           """
           await cursor.execute(q6, (savedDurasi + durasi_tambahan, id_main))  
           await conn.commit()
+
+          # Untuk Websocket. Tarik Data
+          qSelectMain = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectMain, (id_main, ))
+          item_main = await cursor.fetchone()
+
+          qSelectRuangan = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(qSelectRuangan, (item_main['id_ruangan'], ))
+          item_ruangan = await cursor.fetchone()
+
+          # Ini utk aktifkan websocket kirim ke admin
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": id_main,
+                "status": "extend_waktu",
+                "message": f"Ruangan {item_ruangan['nama_ruangan']} Extend Waktu"
+              })
+            )
+          # End Utk Websocket
 
         except aiomysqlerror as e:
           return JSONResponse(content={"Error": f"err mysql Save {e}"}, status_code=500)
@@ -184,6 +207,7 @@ async def save_addon(
 
   except HTTPException as e:
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
+  
   
 
 
