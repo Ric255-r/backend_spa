@@ -58,6 +58,10 @@ if not os.path.exists(IMAGEDIR):
 app = FastAPI(lifespan=lifespan)
 app.mount("/api/images", StaticFiles(directory=IMAGEDIR), name="images")
 
+KONTRAK_DIR = "kontrak"
+os.makedirs(KONTRAK_DIR, exist_ok=True)
+app.mount("/listpekerja/kontrak", StaticFiles(directory=KONTRAK_DIR), name="kontrak")
+
 app.add_middleware(
   CORSMiddleware,
   allow_origins=["*"],
