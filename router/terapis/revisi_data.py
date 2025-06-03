@@ -148,6 +148,24 @@ async def updateRuangan(
           await cursor.execute(q5, (new_kode_ruangan, id_transaksi))
 
           await conn.commit()
+
+          qSelectMain = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectMain, (id_transaksi, ))
+          item_main = await cursor.fetchone()
+
+          qSelectRuangan = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(qSelectRuangan, (item_main['id_ruangan'], ))
+          item_ruangan = await cursor.fetchone()
+
+          # Ini utk aktifkan websocket kirim ke admin
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": id_transaksi,
+                "status": "ganti_ruangan",
+                "message": f"Transaksi/Loker {item_main['id_transaksi']} / {item_main['no_loker']} mengganti ruangan ke {item_ruangan['nama_ruangan']} "
+              })
+            )
         except aiomysqlerror as e:
           await conn.rollback()
           return JSONResponse(content={"Error Mysql": str(e)}, status_code=500)
@@ -245,6 +263,24 @@ async def addon(
           await cursor.execute(q5, (sum_durasi, id_trans))
 
           await conn.commit()
+
+          qSelectMain = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectMain, (id_trans, ))
+          item_main = await cursor.fetchone()
+
+          qSelectRuangan = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(qSelectRuangan, (item_main['id_ruangan'], ))
+          item_ruangan = await cursor.fetchone()
+
+          # Ini utk aktifkan websocket kirim ke admin
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": id_trans,
+                "status": "tambah_paket_produk",
+                "message": f"Ruangan {item_ruangan['nama_ruangan']} menambah paket / produk"
+              })
+            )
 
         except aiomysqlerror as e:
           await conn.rollback()
