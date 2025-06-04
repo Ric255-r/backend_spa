@@ -1,5 +1,7 @@
+import os
 from fastapi import Depends, FastAPI, APIRouter, Security, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi_jwt import JwtAuthorizationCredentials
 from router.routeTest import app as app_test
 from router.user.login import app as app_login
@@ -50,8 +52,15 @@ from router.komisi.komisi import app as app_komisi
 from jwt_auth import access_security
 
 from koneksi import lifespan
-
+IMAGEDIR = "assets/ob"
+if not os.path.exists(IMAGEDIR):
+    os.makedirs(IMAGEDIR)
 app = FastAPI(lifespan=lifespan)
+app.mount("/api/images", StaticFiles(directory=IMAGEDIR), name="images")
+
+KONTRAK_DIR = "kontrak"
+os.makedirs(KONTRAK_DIR, exist_ok=True)
+app.mount("/listpekerja/kontrak", StaticFiles(directory=KONTRAK_DIR), name="kontrak")
 
 app.add_middleware(
   CORSMiddleware,
