@@ -131,13 +131,13 @@ async def storeData(
 
             q2 = """
               INSERT INTO detail_transaksi_fnb(
-                id_detail_transaksi, id_transaksi, id_fnb, qty, satuan, harga_item, harga_total
+                id_detail_transaksi, id_transaksi, id_fnb, qty, satuan, harga_item, harga_total, status
               ) 
               VALUES(
-                %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s
               )
             """
-            await cursor.execute(q2, (new_id_dt, data['id_transaksi'], item['id_fnb'], item['jlh'], item['satuan'], item['harga_fnb'], item['harga_total']))
+            await cursor.execute(q2, (new_id_dt, data['id_transaksi'], item['id_fnb'], item['jlh'], item['satuan'], item['harga_fnb'], item['harga_total'],'paid'))
 
             # Masukin ke tabel kitchen juga
             q4 = """

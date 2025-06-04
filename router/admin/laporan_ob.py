@@ -1,6 +1,7 @@
 import json
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -60,7 +61,7 @@ async def mark_solved(id_laporan: int):
     try:
         pool = await get_db()
         async with pool.acquire() as conn:
-            async with conn.cursor() as cursor:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
                 await cursor.execute("""
                     UPDATE laporan_ob 
@@ -70,6 +71,20 @@ async def mark_solved(id_laporan: int):
                     END 
                     WHERE id_laporan = %s
                 """, (id_laporan,))
+
+
+                await cursor.execute("""
+SELECT lo.*, r.id_ruangan  FROM laporan_ob lo
+                    inner join ruangan r on lo.id_ruangan = r.id_ruangan
+                    WHERE lo.id_laporan = %s
+                """, (id_laporan,))
+                items = await cursor.fetchone()
+
+                await cursor.execute("""
+                    UPDATE ruangan 
+                    SET status = "aktif"
+                    WHERE id_ruangan = %s
+                """, (items['id_laporan'],))
                 await conn.commit()
         return {"message": "Laporan marked as solved"}
     except Exception as e:
