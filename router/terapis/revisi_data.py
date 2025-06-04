@@ -185,7 +185,7 @@ async def addon(
     pool = await get_db() # Get The pool
 
     async with pool.acquire() as conn:  # Auto Release
-      async with conn.cursor() as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
         try:
           await conn.begin()
 
