@@ -148,6 +148,24 @@ async def updateRuangan(
           await cursor.execute(q5, (new_kode_ruangan, id_transaksi))
 
           await conn.commit()
+
+          qSelectMain = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectMain, (id_transaksi, ))
+          item_main = await cursor.fetchone()
+
+          qSelectRuangan = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(qSelectRuangan, (item_main['id_ruangan'], ))
+          item_ruangan = await cursor.fetchone()
+
+          # Ini utk aktifkan websocket kirim ke admin
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": id_transaksi,
+                "status": "ganti_ruangan",
+                "message": f"Transaksi/Loker {item_main['id_transaksi']} / {item_main['no_loker']} mengganti ruangan ke {item_ruangan['nama_ruangan']} "
+              })
+            )
         except aiomysqlerror as e:
           await conn.rollback()
           return JSONResponse(content={"Error Mysql": str(e)}, status_code=500)
@@ -167,7 +185,7 @@ async def addon(
     pool = await get_db() # Get The pool
 
     async with pool.acquire() as conn:  # Auto Release
-      async with conn.cursor() as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
         try:
           await conn.begin()
 
@@ -221,9 +239,9 @@ async def addon(
           qSelectAddOn = "SELECT total_addon, jenis_pembayaran, disc FROM main_transaksi WHERE id_transaksi = %s"
           await cursor.execute(qSelectAddOn, (id_trans, ))
           item_main = await cursor.fetchone()
-          currentTotalAddOn = 0 if not item_main[0] else item_main[0]
-          jenis_pembayaran_main = item_main[1]
-          disc_main = item_main[2]
+          currentTotalAddOn = 0 if not item_main['total_addon'] else item_main['total_addon']
+          jenis_pembayaran_main = item_main['jenis_pembayaran']
+          disc_main = item_main['disc']
 
           # diskonkan kalo dia payment di akhir. 
           if jenis_pembayaran_main == 1:
@@ -238,13 +256,31 @@ async def addon(
           q4 = "SELECT sum_durasi_menit FROM durasi_kerja_sementara WHERE id_transaksi = %s"
           await cursor.execute(q4, (id_trans, ))
           items = await cursor.fetchone()
-          current_durasi = items[0]
+          current_durasi = items['sum_durasi_menit']
           sum_durasi = current_durasi + total_durasi_global
 
           q5 = "UPDATE durasi_kerja_sementara SET sum_durasi_menit = %s WHERE id_transaksi = %s"
           await cursor.execute(q5, (sum_durasi, id_trans))
 
           await conn.commit()
+
+          qSelectMain = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(qSelectMain, (id_trans, ))
+          item_main = await cursor.fetchone()
+
+          qSelectRuangan = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(qSelectRuangan, (item_main['id_ruangan'], ))
+          item_ruangan = await cursor.fetchone()
+
+          # Ini utk aktifkan websocket kirim ke admin
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": id_trans,
+                "status": "tambah_paket_produk",
+                "message": f"Ruangan {item_ruangan['nama_ruangan']} menambah paket / produk"
+              })
+            )
 
         except aiomysqlerror as e:
           await conn.rollback()
