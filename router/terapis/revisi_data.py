@@ -239,9 +239,9 @@ async def addon(
           qSelectAddOn = "SELECT total_addon, jenis_pembayaran, disc FROM main_transaksi WHERE id_transaksi = %s"
           await cursor.execute(qSelectAddOn, (id_trans, ))
           item_main = await cursor.fetchone()
-          currentTotalAddOn = 0 if not item_main[0] else item_main[0]
-          jenis_pembayaran_main = item_main[1]
-          disc_main = item_main[2]
+          currentTotalAddOn = 0 if not item_main['total_addon'] else item_main['total_addon']
+          jenis_pembayaran_main = item_main['jenis_pembayaran']
+          disc_main = item_main['disc']
 
           # diskonkan kalo dia payment di akhir. 
           if jenis_pembayaran_main == 1:
@@ -256,7 +256,7 @@ async def addon(
           q4 = "SELECT sum_durasi_menit FROM durasi_kerja_sementara WHERE id_transaksi = %s"
           await cursor.execute(q4, (id_trans, ))
           items = await cursor.fetchone()
-          current_durasi = items[0]
+          current_durasi = items['sum_durasi_menit']
           sum_durasi = current_durasi + total_durasi_global
 
           q5 = "UPDATE durasi_kerja_sementara SET sum_durasi_menit = %s WHERE id_transaksi = %s"
