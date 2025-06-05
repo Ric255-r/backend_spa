@@ -75,8 +75,8 @@ async def updatefnb(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "UPDATE menu_fnb SET id_kategori = %s, nama_fnb = %s, harga_fnb = %s WHERE id_fnb = %s"
-          await cursor.execute(q1, (data['id_kategori'],data['nama_fnb'],data['harga_fnb'],data['id_fnb']))
+          q1 = "UPDATE menu_fnb SET id_kategori = %s, nama_fnb = %s, harga_fnb = %s, stok_fnb = %s WHERE id_fnb = %s"
+          await cursor.execute(q1, (data['id_kategori'],data['nama_fnb'],data['harga_fnb'],data['stok_fnb'],data['id_fnb']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 

@@ -222,12 +222,29 @@ async def getLaporan() :
         # Restruktur ulang dictionarynya lalu jadikan dataframe supaya membentuk kek sql
         monthly_produk_df = {'bulan': list(monthly_produk.keys()), 'omset_bulanan': list(monthly_produk.values())}
         df_produk = pd.DataFrame(monthly_produk_df) 
+
+        # cek paket populer
+        q5 = """
+          SELECT 
+            p.nama_paket_msg AS label,
+            COUNT(*) AS jumlah_terjual
+          FROM detail_transaksi_paket d
+          JOIN paket_massage p ON d.id_paket = p.id_paket_msg
+          WHERE d.status = 'paid'
+            AND d.is_returned = 0
+          GROUP BY d.id_paket
+          ORDER BY jumlah_terjual DESC
+          LIMIT 4;
+        """
+        await cursor.execute(q5)
+        items5 = await cursor.fetchall()
         
         return {
           "for_line_chart" : items1,
           "monthly_sales": items2,
           "sum_paket": df_paket.to_dict('records'),
           "sum_produk": df_produk.to_dict('records'),
+          "paket_terlaris": items5
         }
 
   except HTTPException as e:

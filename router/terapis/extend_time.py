@@ -84,7 +84,7 @@ async def save_addon(
           # id_dt = data['id_detail_transaksi']
           id_main = data['id_transaksi']
           detail_paket = data.get('detail_paket', [])
-          detail_produk = data.get('detail_produk', [])
+          # detail_produk = data.get('detail_produk', [])
           durasi_tambahan = 0
           total_addon = 0
 
@@ -112,29 +112,29 @@ async def save_addon(
               'unpaid', 1
             ))  
 
-          for item in detail_produk:
-            new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
-            durasi_tambahan += item['extended_duration']
+          # for item in detail_produk:
+          #   new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
+          #   durasi_tambahan += item['extended_duration']
 
-            # qty = int(item['extended_duration']) / int(item['durasi_awal'])
-            # harga_total = qty * item['harga_item']
-            # total_addon += harga_total
-            qty = item['qty']
-            harga_total = item['harga_total']
-            total_addon += harga_total
+          #   # qty = int(item['extended_duration']) / int(item['durasi_awal'])
+          #   # harga_total = qty * item['harga_item']
+          #   # total_addon += harga_total
+          #   qty = item['qty']
+          #   harga_total = item['harga_total']
+          #   total_addon += harga_total
 
-            q2 = """
-              INSERT INTO detail_transaksi_produk(
-                id_detail_transaksi, id_transaksi, id_produk, qty, satuan, 
-                durasi_awal, total_durasi, harga_item, harga_total, 
-                status, is_addon
-              ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            await cursor.execute(q2, (
-              new_id_dt, id_main, item['id_produk'], qty, item['satuan'], 
-              item['durasi_awal'], item['extended_duration'], item['harga_item'], harga_total,
-              'unpaid', 1
-            ))  
+          #   q2 = """
+          #     INSERT INTO detail_transaksi_produk(
+          #       id_detail_transaksi, id_transaksi, id_produk, qty, satuan, 
+          #       durasi_awal, total_durasi, harga_item, harga_total, 
+          #       status, is_addon
+          #     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+          #   """
+          #   await cursor.execute(q2, (
+          #     new_id_dt, id_main, item['id_produk'], qty, item['satuan'], 
+          #     item['durasi_awal'], item['extended_duration'], item['harga_item'], harga_total,
+          #     'unpaid', 1
+          #   ))  
 
           # Select kode maintransaksi utk update addon
           q3 = """
@@ -209,7 +209,28 @@ async def save_addon(
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
   
   
+@app.get('/datapaketextend')
+async def getDataPaketExtend():
+  try:
+    pool = await get_db() # Get The pool
 
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        q1 = "SELECT * FROM paket_extend ORDER BY id_paket_extend ASC"
+        await cursor.execute(q1)
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data Paket Extend": str(e)}, status_code=500)
 
 
 

@@ -20,15 +20,31 @@ async def getdatapromohappyhour() :
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         # await cursor.execute("COMMIT;")
         q1 = """
-            SELECT a.kode_promo, a.nama_promo, 
-            b.detail_kode_promo, b.senin, b.selasa, b.rabu, b.kamis, b.jumat, b.sabtu, b.minggu,
+            SELECT 
+            a.kode_promo, 
+            a.nama_promo, 
+            b.detail_kode_promo, 
+            b.senin, b.selasa, b.rabu, b.kamis, b.jumat, b.sabtu, b.minggu,
             TIME_FORMAT(b.jam_mulai, '%H:%i') AS jam_mulai, 
             TIME_FORMAT(b.jam_selesai, '%H:%i') AS jam_selesai, 
-            b.disc, b.member, b.vip 
-            FROM promo a 
-            INNER JOIN detail_promo_happyhour b 
+            b.disc, 
+            b.member, 
+            b.vip 
+          FROM promo a 
+          INNER JOIN detail_promo_happyhour b 
             ON a.detail_kode_promo = b.detail_kode_promo 
-            ORDER BY a.kode_promo ASC;
+          WHERE 
+            CURTIME() BETWEEN b.jam_mulai AND b.jam_selesai
+            AND CASE DAYOFWEEK(CURDATE())
+              WHEN 1 THEN b.minggu
+              WHEN 2 THEN b.senin
+              WHEN 3 THEN b.selasa
+              WHEN 4 THEN b.rabu
+              WHEN 5 THEN b.kamis
+              WHEN 6 THEN b.jumat
+              WHEN 7 THEN b.sabtu
+            END = 1
+          ORDER BY a.kode_promo ASC
             """
         await cursor.execute(q1)  
 
@@ -138,7 +154,7 @@ async def getdatapromokunjungan() :
 
         q1 = """
             SELECT a.kode_promo, a.nama_promo, 
-            b.detail_kode_promo, b.limit_kunjungan, b.harga_promo, b.durasi, b.discount, b.limit_promo, c.nama_paket_msg, c.harga_paket_msg
+            b.detail_kode_promo, b.limit_kunjungan, b.harga_satuan, b.harga_promo, b.durasi, b.discount, b.limit_promo, c.nama_paket_msg, c.harga_paket_msg
             FROM promo a 
             INNER JOIN detail_promo_kunjungan b 
             ON a.detail_kode_promo = b.detail_kode_promo
@@ -214,11 +230,11 @@ async def deletepromokunjungan(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "DELETE FROM detail_promo_kunjungan WHERE detail_kode_promo IN(SELECT kode_detail_promo FROM PROMO  WHERE kode_promo = %s)"
-          await cursor.execute(q1, (data['kode_promo']))
+          q1 = "DELETE FROM detail_promo_kunjungan WHERE detail_kode_promo IN(SELECT detail_kode_promo FROM PROMO  WHERE kode_promo = %s)"
+          await cursor.execute(q1, (data['kode_promo']),)
 
           q2 = "DELETE FROM PROMO WHERE kode_promo = %s"
-          await cursor.execute(q2,(data['kode_promo']))
+          await cursor.execute(q2,(data['kode_promo']),)
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 

@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 import uuid
 from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile
@@ -8,10 +9,17 @@ from fastapi_jwt import (
   JwtAuthorizationCredentials,
   JwtRefreshBearer
 )
+from typing import List
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
+from fastapi import FastAPI, Request, UploadFile, File, Form
+import base64
+from pathlib import Path
+import aiofiles
 
-# Untuk Routingnya jadi http://192.xx.xx.xx:5500/api/produk/endpointfunction
+KONTRAK_DIR = "kontrak"
+os.makedirs(KONTRAK_DIR, exist_ok=True)
+
 app = APIRouter(
   prefix="/pekerja",
 )
@@ -67,43 +75,108 @@ async def getIdKaryawan(jabatan: str):  # Accept 'category' as a parameter
 
 @app.post('/post_pekerja')
 async def postPekerja(
-  request: Request
+    id_karyawan: str = Form(...),
+    nik: str = Form(...),
+    nama_karyawan: str = Form(...),
+    alamat: str = Form(...),
+    jk: str = Form(...),
+    no_hp: str = Form(...),
+    jabatan: str = Form(...),
+    status: str = Form(...),
+    kontrak_img: List[UploadFile] = File(...)
 ):
-  try:
-    pool = await get_db()
+    try:
+        pool = await get_db()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                try:
+                    await conn.begin()
 
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        try:
-          # 1. Start Transaction
-          await conn.begin()
+                    filenames = []
+                    for file in kontrak_img:
+                        # Generate unique filename with original extension
+                        filename = f"{uuid.uuid4()}_{file.filename}"
+                        file_path = Path(KONTRAK_DIR) / filename
 
-          # 2. Execute querynya
-          data = await request.json()
-          q1 = """
-            INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img) 
-            VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)
-          """
-          await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['jabatan'], data['status'],  data['kontrak_img'])) 
-          # 3. Klo Sukses, dia bkl save ke db
-          await conn.commit()
+                        # Save file asynchronously
+                        async with aiofiles.open(file_path, 'wb') as out_file:
+                            content = await file.read()
+                            await out_file.write(content)
 
-          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
-        except aiomysqlerror as e:
-          # Rollback Input Jika Error
+                        filenames.append(filename)
 
-          # Ambil Error code
-          error_code = e.args[0] if e.args else "Unknown"
+                    # Store filenames (comma-separated or as JSON)
+                    kontrak_str = ",".join(filenames)  # or json.dumps(filenames)
+
+                    # Insert into DB
+                    q1 = """
+                        INSERT INTO karyawan 
+                        (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img) 
+                        VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(q1, (
+                        id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_str
+                    ))
+
+                    await conn.commit()
+
+                    return JSONResponse(
+                        content={"status": "Success", "message": "Data Berhasil Diinput"},
+                        status_code=200
+                    )
+
+                except Exception as e:
+                    await conn.rollback()
+                    return JSONResponse(
+                        content={"status": "Error", "message": f"Server Error: {e}"},
+                        status_code=500
+                    )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"status": "Error", "message": f"Koneksi Error: {str(e)}"},
+            status_code=500
+        )
+
+# @app.post('/post_pekerja')
+# async def postPekerja(
+#   request: Request
+# ):
+#   try:
+#     pool = await get_db()
+
+#     async with pool.acquire() as conn:
+#       async with conn.cursor() as cursor:
+#         try:
+#           # 1. Start Transaction
+#           await conn.begin()
+
+#           # 2. Execute querynya
+#           data = await request.json()
+#           q1 = """
+#             INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img) 
+#             VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)
+#           """
+#           await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['jabatan'], data['status'],  data['kontrak_img'])) 
+#           # 3. Klo Sukses, dia bkl save ke db
+#           await conn.commit()
+
+#           return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
+#         except aiomysqlerror as e:
+#           # Rollback Input Jika Error
+
+#           # Ambil Error code
+#           error_code = e.args[0] if e.args else "Unknown"
           
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+#           await conn.rollback()
+#           return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
         
-        except Exception as e:
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+#         except Exception as e:
+#           await conn.rollback()
+#           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
-  except Exception as e:
-    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+#   except Exception as e:
+#     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
   
 @app.post('/post_ob')
 async def postOb(

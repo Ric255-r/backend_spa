@@ -412,7 +412,7 @@ async def insert_datang(
     pool = await get_db()
 
     async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
         try:
           await conn.begin()
 
@@ -427,7 +427,9 @@ async def insert_datang(
             )
           
           qCheck = """
-            SELECT * FROM terapis_kerja WHERE id_transaksi = %s AND id_terapis = %s AND is_cancel != 1
+            SELECT tk.*, k.nama_karyawan FROM terapis_kerja tk
+            INNER JOIN karyawan k ON tk.id_terapis = k.id_karyawan 
+            WHERE tk.id_transaksi = %s AND tk.id_terapis = %s AND tk.is_cancel != 1
           """
           await cursor.execute(qCheck, (data['id_transaksi'], data['id_terapis']))
           items = await cursor.fetchone()
@@ -435,9 +437,29 @@ async def insert_datang(
           if not items:
             q1 = "INSERT INTO terapis_kerja(id_transaksi, id_terapis, jam_datang) VALUES(%s, %s, %s)"
             await cursor.execute(q1, (data['id_transaksi'], data['id_terapis'], jam_datang))
-
             await conn.commit()
 
+          q2 = """
+            SELECT mt.*, r.nama_ruangan FROM main_transaksi mt
+            INNER JOIN ruangan r ON mt.id_ruangan = r.id_ruangan 
+            WHERE mt.id_transaksi = %s
+            LIMIT 1
+          """
+          await cursor.execute(q2, (data['id_transaksi'], ))
+          items2 = await cursor.fetchone()
+
+          # Ini utk aktifkan websocket kirim ke resepsionis
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": data['id_transaksi'],
+                "status": "terapis_tiba",
+                "message": f"{items['nama_karyawan']} Telah diruangan {items2['nama_ruangan']}"
+              })
+            )
+          
+          print("Isi Item", items)
+          print("Isi Item2", items2)
         except HTTPException as e:
           await conn.rollback()
           return JSONResponse(content={"Status": f"Error {str(e)}"}, status_code=e.status_code)
@@ -447,7 +469,9 @@ async def insert_datang(
           return JSONResponse(content={"status": "error", "message": f"Database Error {str(e)}"}, status_code=500)
         
   except Exception as e:
-    return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+    error_details = traceback.format_exc()
+
+    return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(error_details)}"}, status_code=500)
   
 
 @app.put('/update_mulai')
@@ -622,6 +646,7 @@ async def returPaket(
           jumlah_byr_awal = items['jumlah_bayar']
           status_awal = items['status']
           id_ruangan = items['id_ruangan']
+          pajak = items['pajak']
           # End Bagian Tarik Data Main
 
           # Tarik Data yg diretur
@@ -658,13 +683,16 @@ async def returPaket(
           else:
             nominal_disc = total_hrg_baru * disc_awal
             g_total_baru = total_hrg_baru - nominal_disc
+          
+          nominal_pjk = g_total_baru * float(pajak)
+          gtotal_stlh_pjk = g_total_baru + nominal_pjk
 
           q3 = f"""
-            UPDATE main_transaksi SET sedang_dikerjakan = 1, total_harga = %s, grand_total = %s
-            {", status = 'unpaid'" if g_total_baru > jumlah_byr_awal else ''}
+            UPDATE main_transaksi SET sedang_dikerjakan = 1, total_harga = %s, grand_total = %s, gtotal_stlh_pajak = %s
+            {", status = 'unpaid'" if gtotal_stlh_pjk > jumlah_byr_awal else ''}
             WHERE id_transaksi = %s
           """
-          await cursor.execute(q3, (total_hrg_baru, g_total_baru, id_transaksi))
+          await cursor.execute(q3, (total_hrg_baru, g_total_baru, gtotal_stlh_pjk, id_transaksi))
           # End Update Main Transaksi
 
           # Tarik data lama durasi_kerja_sementara
@@ -715,7 +743,6 @@ async def spv_ob(
     ob_connections.remove(websocket)
 
 async def broadcast_update():
-
   pool = await get_db()
   async with pool.acquire() as conn:
     async with conn.cursor() as cursor:
@@ -811,6 +838,15 @@ async def selesai(
           await conn.commit() 
 
           await broadcast_update()
+
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": data['id_transaksi'],
+                "status": "kamar_selesai",
+                "message": f"{namaruangan} Telah Selesai digunakan"
+              })
+            )
 
           print("Berhasil Eksekusi Semua Fungsi diatas")
         except HTTPException as e:

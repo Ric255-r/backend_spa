@@ -38,43 +38,63 @@ async def getlastestidproduk():
   
 
 @app.post('/daftarproduk')
-async def postpaket(
-  request: Request
-):
-  try:
-    pool = await get_db()
+async def postpaket(request: Request):
+    try:
+        pool = await get_db()
 
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        try:
-          # 1. Start Transaction
-          await conn.begin()
-          lastidproduk = await getlastestidproduk()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                try:
+                    await conn.begin()
+                    lastidproduk = await getlastestidproduk()
 
-          # 2. Execute querynya
-          data = await request.json()
-          q1 = "INSERT INTO menu_produk(id_produk,nama_produk, harga_produk,durasi,tipe_komisi,nominal_komisi, tipe_komisi_gro, nominal_komisi_gro) VALUES(%s, %s, %s, %s, %s,%s,%s,%s)"
-          await cursor.execute(q1, (lastidproduk,data['nama_produk'], data['harga_produk'], data['durasi'],data['tipe_komisi'],data['nominal_komisi'], data['tipe_komisi_gro'], data['nominal_komisi_gro']))
+                    data = await request.json()
 
-          # 3. Klo Sukses, dia bkl save ke db
-          await conn.commit()
+                    # Use .get() with default values
+                    nama_produk = data.get("nama_produk")
+                    harga_produk = data.get("harga_produk", 0)
+                    stok_produk = data.get("stok_produk", 0)
+                    durasi = data.get("durasi", 0)
+                    tipe_komisi = data.get("tipe_komisi", 0)
+                    nominal_komisi = data.get("nominal_komisi", 0)
+                    tipe_komisi_gro = data.get("tipe_komisi_gro", 0)
+                    nominal_komisi_gro = data.get("nominal_komisi_gro", 0)
 
-          return "Succes"
-        except aiomysqlerror as e:
-          # Rollback Input Jika Error
+                    q1 = """
+                        INSERT INTO menu_produk(
+                            id_produk, nama_produk, harga_produk, stok_produk, durasi,
+                            tipe_komisi, nominal_komisi, tipe_komisi_gro, nominal_komisi_gro
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(q1, (
+                        lastidproduk, nama_produk, harga_produk, stok_produk, durasi,
+                        tipe_komisi, nominal_komisi, tipe_komisi_gro, nominal_komisi_gro
+                    ))
 
-          # Ambil Error code
-          error_code = e.args[0] if e.args else "Unknown"
-          
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
-        
-        except Exception as e:
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
-        
-  except Exception as e:
-    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+                    await conn.commit()
+                    return "Success"
+
+                except aiomysqlerror as e:
+                    await conn.rollback()
+                    error_code = e.args[0] if e.args else "Unknown"
+                    return JSONResponse(
+                        content={"status": "Error", "message": f"Database Error {e}"},
+                        status_code=500
+                    )
+
+                except Exception as e:
+                    await conn.rollback()
+                    return JSONResponse(
+                        content={"status": "Error", "message": f"Server Error {e}"},
+                        status_code=500
+                    )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"status": "Error", "message": f"Koneksi Error {str(e)}"},
+            status_code=500
+        )
+
 
 @app.get('/getnamaproduk')
 async def getnamaproduk() :

@@ -1,15 +1,21 @@
+import os
 from typing import Optional
 import uuid
-from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Path, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
+from urllib.parse import unquote
 from fastapi_jwt import (
   JwtAccessBearerCookie,
   JwtAuthorizationCredentials,
   JwtRefreshBearer
 )
+from fastapi.responses import FileResponse
+from fastapi import HTTPException
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
+
+KONTRAK_DIR = os.path.abspath("kontrak")
 
 app = APIRouter(
   prefix="/listpekerja",
@@ -240,3 +246,6 @@ async def cariPekerja(
         
   except Exception as e:
     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+
+
+

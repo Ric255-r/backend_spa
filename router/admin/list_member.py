@@ -38,3 +38,40 @@ async def getDataMember():
 
   except Exception as e:
     return JSONResponse({"Error Get Data User": str(e)}, status_code=500)
+
+@app.delete('/deletemember/{id_member}')
+async def deleteMember(
+  id_member: str,
+  request: Request
+):
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # 1. Start Transaction
+          await conn.begin()
+          
+          q1 = "DELETE FROM member WHERE id_member = %s"
+          await cursor.execute(q1, (id_member,))
+          q2 = "DELETE FROM detail_transaksi_member WHERE id_member = %s"
+          await cursor.execute(q2, (id_member,))
+          await conn.commit()
+
+          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Dihapus"}, status_code=200)
+        except aiomysqlerror as e:
+          # Rollback Input Jika Error
+
+          # Ambil Error code
+          error_code = e.args[0] if e.args else "Unknown"
+          
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+        
+        except Exception as e:
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)

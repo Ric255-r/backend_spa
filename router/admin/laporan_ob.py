@@ -1,5 +1,7 @@
+import json
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -17,30 +19,77 @@ app = APIRouter(
 
 @app.get('/laporanob')
 async def getLaporanOb():
-  try:
-    pool = await get_db() # Get The pool
-
-    async with pool.acquire() as conn:  # Auto Release
-      async with conn.cursor() as cursor:
-        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
-        q1 = """
-            SELECT lo.*, DATE_FORMAT(lo.created_at, '%d/%m/%Y') AS formatted_date, r.nama_ruangan FROM laporan_ob lo 
-            inner join ruangan r on lo.id_ruangan = r.id_ruangan;
-        """
-        await cursor.execute(q1)
-
-        items = await cursor.fetchall()
-
-        column_name = []
-        for kol in cursor.description:
-          column_name.append(kol[0])
+    try:
+        pool = await get_db()  # Ensure this returns aiomysql pool or compatible
         
-        df = pd.DataFrame(items, columns=column_name)
-        return df.to_dict('records')
-    print(df.to_dict('records'))
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+                q1 = """
+                    SELECT lo.*, DATE_FORMAT(lo.created_at, '%d/%m/%Y') AS formatted_date, r.nama_ruangan 
+                    FROM laporan_ob lo 
+                    INNER JOIN ruangan r ON lo.id_ruangan = r.id_ruangan
+                """
+                await cursor.execute(q1)
+                items = await cursor.fetchall()
 
-  except Exception as e:
-    return JSONResponse({"Error Get Laporan OB": str(e)}, status_code=500)
+                column_name = [col[0] for col in cursor.description]
+                df = pd.DataFrame(items, columns=column_name)
+
+                # Safely parse foto_laporan JSON strings
+                def safe_json_loads(x):
+                    try:
+                        if isinstance(x, str) and x.strip():
+                            return json.loads(x)
+                    except Exception:
+                        pass
+                    return []
+
+                df["foto_laporan"] = df["foto_laporan"].apply(safe_json_loads)
+
+                # Convert dataframe to list of dict (JSON serializable)
+                result = df.to_dict(orient='records')
+                return result
+
+    except Exception as e:
+        # Log the error somewhere or print for debug
+        print(f"Error in getLaporanOb: {e}")
+        return JSONResponse({"error": "Failed to get laporan ob", "detail": str(e)}, status_code=500)
+
+@app.put("/updatelaporanob/{id_laporan}")
+async def mark_solved(id_laporan: int):
+    try:
+        pool = await get_db()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+                await cursor.execute("""
+                    UPDATE laporan_ob 
+                    SET is_solved = CASE 
+                        WHEN is_solved = 1 THEN 0 
+                        ELSE 1 
+                    END 
+                    WHERE id_laporan = %s
+                """, (id_laporan,))
+
+
+                await cursor.execute("""
+SELECT lo.*, r.id_ruangan  FROM laporan_ob lo
+                    inner join ruangan r on lo.id_ruangan = r.id_ruangan
+                    WHERE lo.id_laporan = %s
+                """, (id_laporan,))
+                items = await cursor.fetchone()
+
+                await cursor.execute("""
+                    UPDATE ruangan 
+                    SET status = "aktif"
+                    WHERE id_ruangan = %s
+                """, (items['id_laporan'],))
+                await conn.commit()
+        return {"message": "Laporan marked as solved"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # @app.put('/update_pekerja/{id_karyawan}')
 # async def putPekerja(
