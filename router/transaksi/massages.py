@@ -3,7 +3,7 @@ import json
 import traceback
 from typing import Optional
 import uuid
-from fastapi import APIRouter, Query, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect, FastAPI
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
 from fastapi_jwt import (
@@ -74,11 +74,11 @@ async def getPaket():
   except Exception as e:
     return JSONResponse({"Error Get Produk Massage": str(e)}, status_code=500)
 
-
 @app.post('/store')
 async def storeData(
   request: Request
 ):
+  promo_index_store = {}
   try:
     pool = await get_db()
 
@@ -147,50 +147,64 @@ async def storeData(
                 new_id_dt, data['id_transaksi'], item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
                 item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], status_trans, item['is_addon']
               ))
+
+              q_getnamapromo = "SELECT nama_paket_msg FROM paket_massage WHERE id_paket_msg = %s"
+
+              await cursor.execute(q_getnamapromo, (item['id_paket_msg'],))
+              nama_paket = await cursor.fetchone()
+              
               if item['harga_paket_msg'] == 0:
 
                 q_check = """
-                    SELECT dtm.id_member, dtm.kode_promo
+                    SELECT DISTINCT dtm.id_member, dtm.kode_promo 
                     FROM detail_transaksi_member dtm
                     JOIN promo p ON dtm.kode_promo = p.kode_promo
                     JOIN detail_promo_kunjungan dpk ON dpk.detail_kode_promo = p.detail_kode_promo
                     WHERE dtm.id_member = %s AND p.detail_kode_promo LIKE 'DK%%' AND dtm.sisa_kunjungan > 0
-                    LIMIT 1
                 """
 
                 # Only run promo deduction logic if harga_paket_msg == 0 AND id_member is provided
             id_member = data.get('id_member')
 
+            
             if item['harga_paket_msg'] == 0 and id_member and id_member.strip() != "":
                 q_check = """
-                    SELECT dtm.id_member, dtm.kode_promo
+                    SELECT DISTINCT dtm.id_member, dtm.kode_promo, dtm.sisa_kunjungan
                     FROM detail_transaksi_member dtm
                     JOIN promo p ON dtm.kode_promo = p.kode_promo
                     JOIN detail_promo_kunjungan dpk ON dpk.detail_kode_promo = p.detail_kode_promo
-                    WHERE dtm.id_member = %s AND p.detail_kode_promo LIKE 'DK%%' AND dtm.sisa_kunjungan > 0
-                    LIMIT 1
+                    WHERE dtm.id_member = %s AND p.detail_kode_promo LIKE 'DK%%' AND dtm.sisa_kunjungan > 0 AND p.nama_promo = %s
                 """
-                await cursor.execute(q_check, (id_member,))
-                result_check = await cursor.fetchone()
+
+                await cursor.execute(q_check, (id_member,nama_paket))
+                result_check = await cursor.fetchall()
                 print("Promo check result:", result_check)
 
-                if result_check:
-                    id_member_kunjungan, kode_promo_kunjungan = result_check
-                    qty = item['jlh']  # quantity to decrement
-                    print(f"Decrementing sisa_kunjungan by {qty} for member {id_member_kunjungan}, promo {kode_promo_kunjungan}")
-                    
-                    q_update = """
-                        UPDATE detail_transaksi_member
-                        SET sisa_kunjungan = CASE
-                            WHEN sisa_kunjungan >= %s THEN sisa_kunjungan - %s
-                            WHEN sisa_kunjungan > 0 THEN 0
-                            ELSE 0
-                        END
-                        WHERE id_member = %s AND kode_promo = %s;
-                    """
-                    await cursor.execute(q_update, (qty, qty, id_member_kunjungan, kode_promo_kunjungan))
+                if result_check:      
+                      promo_index = promo_index_store.get("promo_key",0) % len(result_check)
+                      id_member_kunjungan = result_check[promo_index][0]
+                      kode_promo_kunjungan = result_check[promo_index][1]
 
+                      qty = item['jlh']
+                      # qty = promo_qty_map.get(kode_promo_kunjungan)  # quantity to decrement
 
+                      # if qty is None :
+                      #   print(f"skipping decrement for member {id_member_kunjungan}, promo {kode_promo_kunjungan}")
+                      #   continue
+
+                      print(f"Decrementing sisa_kunjungan by {qty} for member {id_member_kunjungan}, promo {kode_promo_kunjungan}")
+
+                      q_update = """
+                          UPDATE detail_transaksi_member
+                          SET sisa_kunjungan = CASE
+                              WHEN sisa_kunjungan >= %s THEN sisa_kunjungan - %s
+                              WHEN sisa_kunjungan > 0 THEN 0
+                              ELSE 0
+                          END
+                          WHERE id_member = %s AND kode_promo = %s;
+                      """
+                      await cursor.execute(q_update, (qty, qty, id_member_kunjungan, kode_promo_kunjungan))
+                promo_index_store["promo_key"] = promo_index + 1
                 print("About to commit transaction")
                 await conn.commit()
                 

@@ -163,6 +163,7 @@ async def updateRuangan(
 async def addon(
   request: Request,
 ):
+  promo_index_store = {}
   try:
     pool = await get_db() # Get The pool
 
@@ -175,6 +176,7 @@ async def addon(
           id_trans = data['id_transaksi']
 
           details = data.get('detail_trans', [])
+          print('detail adalah :', details)
           total_addon = 0
           total_durasi_global = 0
           for item in details:
@@ -218,6 +220,68 @@ async def addon(
                 total_durasi, item['harga_paket_msg'], item['harga_total'], item['status'], item['is_addon']
               ))
 
+            q_getnamapromo = "SELECT nama_paket_msg FROM paket_massage WHERE id_paket_msg = %s"
+            await cursor.execute(q_getnamapromo, (item['id_paket_msg'],))
+            nama_paket = await cursor.fetchone()
+            print('nama paket', nama_paket)
+              
+            if item['harga_paket_msg'] == 0:
+
+                q_check = """
+                    SELECT DISTINCT dtm.id_member, dtm.kode_promo 
+                    FROM detail_transaksi_member dtm
+                    JOIN promo p ON dtm.kode_promo = p.kode_promo
+                    JOIN detail_promo_kunjungan dpk ON dpk.detail_kode_promo = p.detail_kode_promo
+                    WHERE dtm.id_member = %s AND p.detail_kode_promo LIKE 'DK%%' AND dtm.sisa_kunjungan > 0
+                """
+
+                # Only run promo deduction logic if harga_paket_msg == 0 AND id_member is provided
+            q_getidmember = "SELECT id_member FROM main_transaksi WHERE id_transaksi = %s"
+            await cursor.execute(q_getidmember, (id_trans,))
+            id_member = await cursor.fetchone()
+
+            print('idmember :',id_member)
+            
+            if item['harga_paket_msg'] == 0 and id_member[0] and id_member[0].strip() != "":
+                q_check = """
+                    SELECT DISTINCT dtm.id_member, dtm.kode_promo, dtm.sisa_kunjungan
+                    FROM detail_transaksi_member dtm
+                    JOIN promo p ON dtm.kode_promo = p.kode_promo
+                    JOIN detail_promo_kunjungan dpk ON dpk.detail_kode_promo = p.detail_kode_promo
+                    WHERE dtm.id_member = %s AND p.detail_kode_promo LIKE 'DK%%' AND dtm.sisa_kunjungan > 0 AND p.nama_promo = %s
+                """
+
+                await cursor.execute(q_check, (id_member,nama_paket))
+                result_check = await cursor.fetchall()
+                print("Promo check result:", result_check)
+
+                if result_check:      
+                      promo_index = promo_index_store.get("promo_key",0) % len(result_check)
+                      id_member_kunjungan = result_check[promo_index][0]
+                      kode_promo_kunjungan = result_check[promo_index][1]
+
+                      qty = item['jlh']
+                      # qty = promo_qty_map.get(kode_promo_kunjungan)  # quantity to decrement
+
+                      # if qty is None :
+                      #   print(f"skipping decrement for member {id_member_kunjungan}, promo {kode_promo_kunjungan}")
+                      #   continue
+
+                      print(f"Decrementing sisa_kunjungan by {qty} for member {id_member_kunjungan}, promo {kode_promo_kunjungan}")
+
+                      q_update = """
+                          UPDATE detail_transaksi_member
+                          SET sisa_kunjungan = CASE
+                              WHEN sisa_kunjungan >= %s THEN sisa_kunjungan - %s
+                              WHEN sisa_kunjungan > 0 THEN 0
+                              ELSE 0
+                          END
+                          WHERE id_member = %s AND kode_promo = %s;
+                      """
+                      await cursor.execute(q_update, (qty, qty, id_member_kunjungan, kode_promo_kunjungan))
+                promo_index_store["promo_key"] = promo_index + 1
+                print("About to commit transaction")
+          
           qSelectAddOn = "SELECT total_addon, jenis_pembayaran, disc FROM main_transaksi WHERE id_transaksi = %s"
           await cursor.execute(qSelectAddOn, (id_trans, ))
           item_main = await cursor.fetchone()
@@ -243,8 +307,10 @@ async def addon(
 
           q5 = "UPDATE durasi_kerja_sementara SET sum_durasi_menit = %s WHERE id_transaksi = %s"
           await cursor.execute(q5, (sum_durasi, id_trans))
-
+                
           await conn.commit()
+
+
 
         except aiomysqlerror as e:
           await conn.rollback()
