@@ -49,6 +49,7 @@ from router.transaksi.member import app as app_transmember
 from router.owner.main_owner import app as app_owner
 from router.resepsionis.history_member import app as app_historymember
 from router.komisi.komisi import app as app_komisi
+from router.admin.pajak import app as app_pajak
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -116,6 +117,7 @@ main_router.include_router(app_transmember)
 main_router.include_router(app_owner)
 main_router.include_router(app_historymember)
 main_router.include_router(app_komisi)
+main_router.include_router(app_pajak)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
 
