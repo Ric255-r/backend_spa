@@ -80,8 +80,8 @@ async def postpaket(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO menu_fnb(id_fnb,nama_fnb, harga_fnb,id_kategori,status_fnb) VALUES(%s, %s, %s, %s, %s)"
-          await cursor.execute(q1, (lastidfnb,data['nama_fnb'], data['harga_fnb'], data['id_kategori'],data['status_fnb']))
+          q1 = "INSERT INTO menu_fnb(id_fnb,nama_fnb, harga_fnb, stok_fnb, id_kategori,status_fnb) VALUES(%s, %s, %s, %s, %s, %s)"
+          await cursor.execute(q1, (lastidfnb,data['nama_fnb'], data['harga_fnb'], data['stok_fnb'], data['id_kategori'],data['status_fnb']))
 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()

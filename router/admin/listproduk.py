@@ -49,8 +49,8 @@ async def updateproduk(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "UPDATE menu_produk SET nama_produk = %s, harga_produk = %s, durasi = %s, tipe_komisi = %s, nominal_komisi = %s, tipe_komisi_gro = %s, nominal_komisi_gro = %s  WHERE id_produk= %s"
-          await cursor.execute(q1, (data['nama_produk'],data['harga_produk'],data['durasi'],data['tipe_komisi'],data['nominal_komisi'],data['tipe_komisi_gro'],data['nominal_komisi_gro'],data['id_produk']))
+          q1 = "UPDATE menu_produk SET nama_produk = %s, harga_produk = %s, stok_produk = %s, durasi = %s, tipe_komisi = %s, nominal_komisi = %s, tipe_komisi_gro = %s, nominal_komisi_gro = %s  WHERE id_produk= %s"
+          await cursor.execute(q1, (data['nama_produk'],data['harga_produk'],data['stok_produk'],data['durasi'],data['tipe_komisi'],data['nominal_komisi'],data['tipe_komisi_gro'],data['nominal_komisi_gro'],data['id_produk']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 

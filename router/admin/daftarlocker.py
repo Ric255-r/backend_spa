@@ -72,3 +72,28 @@ async def daftarlocker(
         
   except Exception as e:
     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+
+@app.delete("/deletelast")
+async def delete_latest_loker():
+    try:
+        pool = await get_db()
+
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                # Get the latest locker (max id_loker)
+                await cursor.execute("SELECT id_loker FROM data_loker ORDER BY id_loker DESC LIMIT 1")
+                row = await cursor.fetchone()
+
+                if not row:
+                    return JSONResponse(content={"message": "No lockers to delete."}, status_code=404)
+
+                latest_id = row[0]
+
+                # Delete the latest locker
+                await cursor.execute("DELETE FROM data_loker WHERE id_loker = %s", (latest_id,))
+                await conn.commit()
+
+                return {"message": f"Locker with id_loker {latest_id} deleted."}
+
+    except Exception as e:
+        return JSONResponse(content={"message": f"Error: {e}"}, status_code=500)
