@@ -1,7 +1,9 @@
 import asyncio
 import json
+import os
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, Query, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -159,3 +161,34 @@ async def getHistory(id_member: str):
         import traceback
         traceback.print_exc()
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.get("/detail_member/{id_member}")
+async def get_member_detail(id_member: str):
+    try:
+        pool = await get_db()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                query = "SELECT id_gelang FROM member WHERE id_member = %s"
+                await cursor.execute(query, (id_member,))
+                result = await cursor.fetchone()
+
+                if result is None:
+                    raise HTTPException(status_code=404, detail="Member not found")
+
+                id_gelang = result[0]
+
+                # Build full URL (adjust the base URL as needed)
+                qr_filename = os.path.basename(id_gelang)
+                base_url = "http://192.168.1.3:5500"  # Change this to your IP or domain
+                qr_url = f"{base_url}/qrcodes/{qr_filename}"
+
+                return JSONResponse(status_code=200, content={
+                    "status": "Success",
+                    "qr_url": qr_url
+                })
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={
+            "status": "Error",
+            "message": str(e)
+        })
