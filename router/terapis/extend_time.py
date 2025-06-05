@@ -84,7 +84,7 @@ async def save_addon(
           # id_dt = data['id_detail_transaksi']
           id_main = data['id_transaksi']
           detail_paket = data.get('detail_paket', [])
-          detail_produk = data.get('detail_produk', [])
+          # detail_produk = data.get('detail_produk', [])
           durasi_tambahan = 0
           total_addon = 0
 

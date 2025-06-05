@@ -743,7 +743,6 @@ async def spv_ob(
     ob_connections.remove(websocket)
 
 async def broadcast_update():
-
   pool = await get_db()
   async with pool.acquire() as conn:
     async with conn.cursor() as cursor:
@@ -839,6 +838,15 @@ async def selesai(
           await conn.commit() 
 
           await broadcast_update()
+
+          for ws_con in kamar_connection:
+            await ws_con.send_text(
+              json.dumps({
+                "id_transaksi": data['id_transaksi'],
+                "status": "kamar_selesai",
+                "message": f"{namaruangan} Telah Selesai digunakan"
+              })
+            )
 
           print("Berhasil Eksekusi Semua Fungsi diatas")
         except HTTPException as e:
