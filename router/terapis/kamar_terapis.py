@@ -684,7 +684,7 @@ async def returPaket(
             nominal_disc = total_hrg_baru * disc_awal
             g_total_baru = total_hrg_baru - nominal_disc
           
-          nominal_pjk = g_total_baru * float(pajak)
+          nominal_pjk = g_total_baru * pajak
           gtotal_stlh_pjk = g_total_baru + nominal_pjk
 
           q3 = f"""
@@ -922,7 +922,7 @@ async def delete_waktu(
           q4 = "UPDATE karyawan SET is_occupied = FALSE WHERE id_karyawan = %s"
           await cursor.execute(q4, (id_terapis, ))
 
-          q5 = "UPDATE ruangan SET status = 'maintenance' WHERE id_ruangan = %s"
+          q5 = "UPDATE ruangan SET status = 'aktif' WHERE id_ruangan = %s"
           await cursor.execute(q5, (id_ruangan, ))
 
           await conn.commit()
@@ -939,31 +939,4 @@ async def delete_waktu(
   except Exception as e:
     return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
   
-@app.get('/getidmember')
-async def getidmember(
-  request: Request
-):
-  try:
-    pool = await get_db() # Get The pool
-
-    async with pool.acquire() as conn:  # Auto Release
-      async with conn.cursor() as cursor:
-        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
-
-        data = await request.json()
-
-        q1 = "SELECT id_member FROM main_transaksi WHERE id_transaksi = %s"
-        await cursor.execute(q1,(data['id_transaksi']))
-
-        items = await cursor.fetchall()
-
-        column_name = []
-        for kol in cursor.description:
-          column_name.append(kol[0])
-
-        df = pd.DataFrame(items, columns=column_name)
-        return df.to_dict('records')
-
-  except Exception as e:
-    return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
   
