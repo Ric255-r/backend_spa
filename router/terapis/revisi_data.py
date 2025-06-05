@@ -251,8 +251,8 @@ async def addon(
           # end Diskon
 
           # kenakan pajak ke addon baru
-          nominal_pjk = total_addon * float(pajak_main)
-          total_addon += nominal_pjk
+          # nominal_pjk = total_addon * float(pajak_main)
+          # total_addon += nominal_pjk
 
           q3 = "UPDATE main_transaksi SET total_addon = %s WHERE id_transaksi = %s"
           await cursor.execute(q3, (currentTotalAddOn + total_addon, id_trans))

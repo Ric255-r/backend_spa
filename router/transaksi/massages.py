@@ -302,7 +302,7 @@ async def pelunasan(
           # jlhbyr_addon = data['jumlah_bayar']
 
           q1 = """
-            SELECT gtotal_stlh_pajak, total_addon, jumlah_bayar, jumlah_kembalian, pajak FROM main_transaksi
+            SELECT grand_total, gtotal_stlh_pajak, total_addon, jumlah_bayar, jumlah_kembalian, pajak FROM main_transaksi
             WHERE id_transaksi = %s
           """
           await cursor.execute(q1, (id_trans, ))
@@ -310,13 +310,14 @@ async def pelunasan(
           # Pake await fetchone, krn hanya mw ambil 1 baris data.
           # rSelect = result select
           rSelect = await cursor.fetchone()
-          grand_total = rSelect[0] # ini gtotal_stlh_pajak
-          total_addon = rSelect[1]
-          jlh_byr_main = rSelect[2]
-          jlh_kembali_main = rSelect[3]
-          pajak = rSelect[4]
+          main_grand_total = rSelect[0] # tanpa pajak
+          grand_total = rSelect[1] # ini gtotal_stlh_pajak
+          total_addon = rSelect[2]
+          jlh_byr_main = rSelect[3]
+          jlh_kembali_main = rSelect[4]
+          pajak = rSelect[5]
 
-          nominal_pjk_addon = total_addon * float(pajak)
+          nominal_pjk_addon = total_addon * pajak
           total_addon += nominal_pjk_addon # ini sudah plus pajak
 
           # Jika ganti paket
@@ -325,9 +326,9 @@ async def pelunasan(
           else:
             sum_jlh_byr = grand_total + total_addon
 
-          # Balikin harga ke sblm pajak utk grandtotal no pajak
-          nominal_sblm_pjk = (grand_total + total_addon) * float(pajak)
-          gtotal_non_pajak = (grand_total + total_addon) - nominal_sblm_pjk
+          # # Balikin harga ke sblm pajak utk grandtotal no pajak
+          # nominal_sblm_pjk = (grand_total + total_addon) * float(pajak)
+          gtotal_non_pajak = (main_grand_total + total_addon - nominal_pjk_addon) 
 
           if metode_bayar == "debit" or metode_bayar == "qris":
             nama_akun = data['nama_akun']

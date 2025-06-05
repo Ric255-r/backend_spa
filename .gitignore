@@ -3,3 +3,5 @@ koneksi_config.txt
 testadmin.py
 testadminbushub.py
 main.py
+build
+dist
