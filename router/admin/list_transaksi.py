@@ -16,6 +16,80 @@ app = APIRouter(
   prefix="/listtrans",
 )
 
+@app.get('/cek_rating')
+async def cek_rating(
+  id_transaksi: str
+) :
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      # wajib tambahi parameter aiomysql.DictCursor untuk buat hasil dalam bentuk dictionary
+      # karena ak filter langsung make for loop yang item['is_addon']
+      # jadi ga usah pake pd.Dataframe lagi
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try: 
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+          q1 = """
+            SELECT * FROM rating WHERE id_transaksi = %s
+          """ 
+          await cursor.execute(q1, (id_transaksi, ))
+          items = await cursor.fetchone()
+          
+          # Jika None di db, maka boleh isi rating, klo ad g blh
+          return {
+            "is_first_time": items is None,
+            "data": items if items else {}
+          }
+
+        except aiomysqlerror as e:
+          await conn.rollback()
+          return JSONResponse({"Error aiomysql store rating": str(e)}, status_code=500)
+        except HTTPException as e:
+          await conn.rollback()
+          return JSONResponse({"Error HTTP": str(e.headers)}, status_code=e.status_code)
+
+  except Exception as e:
+    return JSONResponse({"Error store rating Trans": str(e)}, status_code=500)
+
+@app.post('/store_rating')
+async def store_rating(
+  request: Request
+) :
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      # wajib tambahi parameter aiomysql.DictCursor untuk buat hasil dalam bentuk dictionary
+      # karena ak filter langsung make for loop yang item['is_addon']
+      # jadi ga usah pake pd.Dataframe lagi
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try: 
+          data = await request.json()
+
+          await conn.begin()
+
+          q1 = """
+            INSERT INTO rating(id_transaksi, pelayanan_terapis, fasilitas, pelayanan_keseluruhan)          
+            VALUES(%s, %s, %s, %s)
+          """ 
+          await cursor.execute(q1, (data['id_transaksi'], data['pelayanan_terapis'], data['fasilitas'], data['pelayanan_keseluruhan']))
+          await conn.commit()
+
+
+        except aiomysqlerror as e:
+          await conn.rollback()
+          return JSONResponse({"Error aiomysql store rating": str(e)}, status_code=500)
+        except HTTPException as e:
+          await conn.rollback()
+          return JSONResponse({"Error HTTP": str(e.headers)}, status_code=e.status_code)
+
+  except Exception as e:
+    return JSONResponse({"Error store rating Trans": str(e)}, status_code=500)
+
+
+
 # Buat Cek di struk
 @app.get("/cek_struk_member")
 async def check_struk(id_trans: str):
