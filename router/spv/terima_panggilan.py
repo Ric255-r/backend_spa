@@ -86,8 +86,7 @@ async def daftarpanggilankerja(
                   "nama_terapis": row[2],
                   "timestamp" : datetime.datetime.now().isoformat()
                 } for row in all_records]
-            print(f"retrieved lastidpanggilan : {lastidpanggilan}")
-            print(f"sendong websocket data: {message_data}")
+      
             for ws_con in spv_connection:
               await ws_con.send_text(
                 json.dumps(message_data)
