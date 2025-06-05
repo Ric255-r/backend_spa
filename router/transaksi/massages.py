@@ -302,7 +302,7 @@ async def pelunasan(
           # jlhbyr_addon = data['jumlah_bayar']
 
           q1 = """
-            SELECT grand_total, total_addon, jumlah_bayar, jumlah_kembalian FROM main_transaksi
+            SELECT gtotal_stlh_pajak, total_addon, jumlah_bayar, jumlah_kembalian, pajak FROM main_transaksi
             WHERE id_transaksi = %s
           """
           await cursor.execute(q1, (id_trans, ))
@@ -310,10 +310,14 @@ async def pelunasan(
           # Pake await fetchone, krn hanya mw ambil 1 baris data.
           # rSelect = result select
           rSelect = await cursor.fetchone()
-          grand_total = rSelect[0]
+          grand_total = rSelect[0] # ini gtotal_stlh_pajak
           total_addon = rSelect[1]
           jlh_byr_main = rSelect[2]
           jlh_kembali_main = rSelect[3]
+          pajak = rSelect[4]
+
+          nominal_pjk_addon = total_addon * float(pajak)
+          total_addon += nominal_pjk_addon # ini sudah plus pajak
 
           # Jika ganti paket
           if jlh_byr_main > 0:
@@ -321,26 +325,30 @@ async def pelunasan(
           else:
             sum_jlh_byr = grand_total + total_addon
 
+          # Balikin harga ke sblm pajak utk grandtotal no pajak
+          nominal_sblm_pjk = (grand_total + total_addon) * float(pajak)
+          gtotal_non_pajak = (grand_total + total_addon) - nominal_sblm_pjk
+
           if metode_bayar == "debit" or metode_bayar == "qris":
             nama_akun = data['nama_akun']
             no_rek = data['no_rek']
             nama_bank = data['nama_bank']
 
             q2 = """
-              UPDATE main_transaksi SET grand_total = %s, total_addon = %s, 
+              UPDATE main_transaksi SET grand_total = %s, gtotal_stlh_pajak = %s, total_addon = %s, 
               jumlah_bayar = %s, jumlah_kembalian = 0,
               status = %s, nama_akun = %s, no_rek = %s, nama_bank = %s
               WHERE id_transaksi = %s
             """
-            await cursor.execute(q2, (grand_total + total_addon, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, id_trans))
+            await cursor.execute(q2, (gtotal_non_pajak, grand_total + total_addon, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, id_trans))
           # else bayar cash
           else:
             q2 = """
-              UPDATE main_transaksi SET grand_total = %s, total_addon = %s, 
+              UPDATE main_transaksi SET grand_total = %s, gtotal_stlh_pajak = %s, total_addon = %s, 
               jumlah_bayar = %s, jumlah_kembalian = 0,
               status = %s WHERE id_transaksi = %s
             """
-            await cursor.execute(q2, (grand_total + total_addon, 0, sum_jlh_byr, 'done', id_trans))
+            await cursor.execute(q2, (gtotal_non_pajak, grand_total + total_addon, 0, sum_jlh_byr, 'done', id_trans))
 
           q3 = """
             UPDATE detail_transaksi_produk SET status = 'paid' WHERE id_transaksi = %s

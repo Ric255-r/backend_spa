@@ -236,18 +236,23 @@ async def addon(
                 total_durasi, item['harga_paket_msg'], item['harga_total'], item['status'], item['is_addon']
               ))
 
-          qSelectAddOn = "SELECT total_addon, jenis_pembayaran, disc FROM main_transaksi WHERE id_transaksi = %s"
+          qSelectAddOn = "SELECT total_addon, jenis_pembayaran, disc, pajak FROM main_transaksi WHERE id_transaksi = %s"
           await cursor.execute(qSelectAddOn, (id_trans, ))
           item_main = await cursor.fetchone()
           currentTotalAddOn = 0 if not item_main['total_addon'] else item_main['total_addon']
           jenis_pembayaran_main = item_main['jenis_pembayaran']
           disc_main = item_main['disc']
+          pajak_main = item_main['pajak']
 
           # diskonkan kalo dia payment di akhir. 
           if jenis_pembayaran_main == 1:
             disc_nominal_addon = total_addon * disc_main
             total_addon -= disc_nominal_addon
           # end Diskon
+
+          # kenakan pajak ke addon baru
+          nominal_pjk = total_addon * float(pajak_main)
+          total_addon += nominal_pjk
 
           q3 = "UPDATE main_transaksi SET total_addon = %s WHERE id_transaksi = %s"
           await cursor.execute(q3, (currentTotalAddOn + total_addon, id_trans))
