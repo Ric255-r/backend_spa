@@ -134,6 +134,11 @@ async def storeData(
                 (new_id_dt, data['id_transaksi'], item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
                  item['jlh'] * item['durasi_awal'], item['harga_paket_msg'], item['harga_total'], status_trans, item['is_addon'])
               )
+
+              q3 = "UPDATE menu_produk SET stok_produk = stok_produk - %s where id_produk = %s"
+
+              await cursor.execute(q3, (item['jlh'], item['id_paket_msg'],))
+
             else:
               q2 = """
                 INSERT INTO detail_transaksi_paket(
