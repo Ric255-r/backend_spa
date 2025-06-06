@@ -267,9 +267,15 @@ async def get_detail(
 
           # Query package details
           q_paket = f"""
-            SELECT dtp.*, m.nama_paket_msg
+            SELECT dtp.*, 
+              CASE 
+                WHEN m.id_paket_msg IS NOT NULL THEN m.nama_paket_msg
+                WHEN pe.id_paket_extend IS NOT NULL THEN pe.nama_paket_extend
+                ELSE 'Unknown Paket'
+              END AS nama_paket_msg
             FROM detail_transaksi_paket dtp
             LEFT JOIN paket_massage m ON dtp.id_paket = m.id_paket_msg
+            LEFT JOIN paket_extend pe ON dtp.id_paket = pe.id_paket_extend
             WHERE dtp.id_transaksi = %s
             ORDER BY dtp.id_transaksi
           """
