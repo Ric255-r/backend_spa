@@ -57,38 +57,49 @@ async def getLaporanOb():
         return JSONResponse({"error": "Failed to get laporan ob", "detail": str(e)}, status_code=500)
 
 @app.put("/updatelaporanob/{id_laporan}")
-async def mark_solved(id_laporan: int):
+async def update_laporan_ob(id_laporan: str):
     try:
         pool = await get_db()
         async with pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
-                await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+                # Get current laporan + related id_ruangan
                 await cursor.execute("""
-                    UPDATE laporan_ob 
-                    SET is_solved = CASE 
-                        WHEN is_solved = 1 THEN 0 
-                        ELSE 1 
-                    END 
-                    WHERE id_laporan = %s
-                """, (id_laporan,))
-
-
-                await cursor.execute("""
-SELECT lo.*, r.id_ruangan  FROM laporan_ob lo
-                    inner join ruangan r on lo.id_ruangan = r.id_ruangan
+                    SELECT lo.is_solved, lo.id_ruangan 
+                    FROM laporan_ob lo
+                    LEFT JOIN ruangan r ON lo.id_ruangan = r.id_ruangan
                     WHERE lo.id_laporan = %s
                 """, (id_laporan,))
-                items = await cursor.fetchone()
 
+                data = await cursor.fetchone()
+
+                if not data:
+                    raise HTTPException(status_code=404, detail="Laporan not found")
+
+                current_status = data['is_solved']
+                id_ruangan = data['id_ruangan']
+                new_status = 0 if current_status == 1 else 1
+
+                # Update laporan status
                 await cursor.execute("""
-                    UPDATE ruangan 
-                    SET status = "aktif"
+                    UPDATE laporan_ob
+                    SET is_solved = %s
+                    WHERE id_laporan = %s
+                """, (new_status, id_laporan))
+
+                # Update ruangan status based on new is_solved
+                ruangan_status = "aktif" if new_status == 1 else "maintenance"
+                await cursor.execute("""
+                    UPDATE ruangan
+                    SET status = %s
                     WHERE id_ruangan = %s
-                """, (items['id_laporan'],))
+                """, (ruangan_status, id_ruangan))
+
                 await conn.commit()
-        return {"message": "Laporan marked as solved"}
+
+                return {"message": "Laporan status updated", "new_status": new_status}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
 
 
 # @app.put('/update_pekerja/{id_karyawan}')
