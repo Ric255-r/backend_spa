@@ -164,19 +164,34 @@ async def getLatestTrans(
 
           # Start Query Paket. jika id_trans ada isiny, maka ambil data yg sedang_dikerjakan = true
           q_paket = f"""
-            SELECT dtpa.id_paket, pm.nama_paket_msg, dtpa.durasi_awal, 
+            SELECT dtpa.id_paket, dtpa.durasi_awal,
+            CASE 
+              WHEN pm.id_paket_msg IS NOT NULL THEN pm.nama_paket_msg
+              WHEN pe.id_paket_extend IS NOT NULL THEN pe.nama_paket_extend
+              ELSE 'Unknown Paket'
+            END AS nama_paket_msg,  
             dtpa.total_durasi, pm.detail_paket as deskripsi_paket, m.id_transaksi,
             m.created_at as tgl_transaksi, m.id_terapis, dtpa.id_detail_transaksi,
             k.nama_karyawan, r.nama_ruangan, r.id_karyawan AS kode_ruangan, dtpa.status AS status_detail,
             dtpa.is_addon, dtpa.harga_total
-            FROM detail_transaksi_paket dtpa 
-            INNER JOIN main_transaksi m ON dtpa.id_transaksi = m.id_transaksi
-            INNER JOIN karyawan k ON m.id_terapis = k.id_karyawan
-            LEFT JOIN ruangan r ON m.id_ruangan = r.id_ruangan
-            LEFT JOIN paket_massage pm ON dtpa.id_paket = pm.id_paket_msg
-            WHERE m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
-            AND m.status NOT IN ('done', 'done-unpaid-addon', 'done-unpaid', 'draft')
-            AND dtpa.is_returned != 1
+            FROM 
+              detail_transaksi_paket dtpa 
+            INNER JOIN 
+              main_transaksi m ON dtpa.id_transaksi = m.id_transaksi
+            INNER JOIN 
+              karyawan k ON m.id_terapis = k.id_karyawan
+            LEFT JOIN 
+              ruangan r ON m.id_ruangan = r.id_ruangan
+            LEFT JOIN 
+              paket_massage pm ON dtpa.id_paket = pm.id_paket_msg
+            LEFT JOIN 
+              paket_extend pe ON dtpa.id_paket = pe.id_paket_extend
+            WHERE 
+              m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
+            AND 
+              m.status NOT IN ('done', 'done-unpaid-addon', 'done-unpaid', 'draft')
+            AND 
+              dtpa.is_returned != 1
             {'AND m.id_transaksi = %s' if id_trans is not None else ''}
             ORDER BY m.created_at DESC
           """ 
