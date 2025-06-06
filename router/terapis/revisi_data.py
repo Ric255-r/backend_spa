@@ -314,6 +314,8 @@ async def addon(
             total_addon -= disc_nominal_addon
           # end Diskon
 
+          print(f"Isi Total Addon tambahpaket {total_addon}")
+
           # kenakan pajak ke addon baru
           # nominal_pjk = total_addon * float(pajak_main)
           # total_addon += nominal_pjk
