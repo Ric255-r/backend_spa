@@ -939,4 +939,33 @@ async def delete_waktu(
   except Exception as e:
     return JSONResponse(content={"status": "error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
   
+@app.get('/getidmember')
+async def getidmember(
+  request : Request
+) :
+  try :
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        data = await request.json()
+        # await cursor.execute("COMMIT;")
+
+        qtarikmember = "SELECT id_member FROM main_transaksi WHERE id_transaksi = %s"
+
+        await cursor.execute(qtarikmember,(data['id_transaksi']))  
+
+        items = await cursor.fetchall()
+
+        kolom_menu = [kolom[0] for kolom in cursor.description]
+        df = pd.DataFrame(items, columns=kolom_menu)
+
+        # print(" Final fetched items:", items)
+        return df.to_dict('records')
+  except HTTPException as e:
+   return JSONResponse({"Error": str(e)}, status_code=e.status_code)
+
+  
   
