@@ -258,9 +258,12 @@ async def addon(
             await cursor.execute(q_getidmember, (id_trans,))
             id_member = await cursor.fetchone()
 
-            print('idmember :',id_member)
+            if id_member :
+              print('id member :',id_member['id_member'])
+            else :
+              print('id member not fetched')
             
-            if item['harga_paket_msg'] == 0 and id_member[0] and id_member[0].strip() != "":
+            if item['harga_paket_msg'] == 0 and id_member['id_member'] and id_member['id_member'].strip() != "":
                 q_check = """
                     SELECT DISTINCT dtm.id_member, dtm.kode_promo, dtm.sisa_kunjungan
                     FROM detail_transaksi_member dtm
@@ -268,15 +271,17 @@ async def addon(
                     JOIN detail_promo_kunjungan dpk ON dpk.detail_kode_promo = p.detail_kode_promo
                     WHERE dtm.id_member = %s AND p.detail_kode_promo LIKE 'DK%%' AND dtm.sisa_kunjungan > 0 AND p.nama_promo = %s
                 """
-
-                await cursor.execute(q_check, (id_member,nama_paket))
+                await cursor.execute(q_check, (id_member['id_member'],nama_paket['nama_paket_msg']))
                 result_check = await cursor.fetchall()
+                
                 print("Promo check result:", result_check)
 
                 if result_check:      
                       promo_index = promo_index_store.get("promo_key",0) % len(result_check)
-                      id_member_kunjungan = result_check[promo_index][0]
-                      kode_promo_kunjungan = result_check[promo_index][1]
+                      id_member_kunjungan = result_check[promo_index]['id_member']
+                      kode_promo_kunjungan = result_check[promo_index]['kode_promo']
+                      print('id member:', id_member_kunjungan)
+                      print('kode promo member:', kode_promo_kunjungan)
 
                       qty = item['jlh']
                       # qty = promo_qty_map.get(kode_promo_kunjungan)  # quantity to decrement
@@ -303,6 +308,8 @@ async def addon(
           qSelectAddOn = "SELECT total_addon, jenis_pembayaran, disc, pajak FROM main_transaksi WHERE id_transaksi = %s"
           await cursor.execute(qSelectAddOn, (id_trans, ))
           item_main = await cursor.fetchone()
+
+          print('item_main :',item_main)
           currentTotalAddOn = 0 if not item_main['total_addon'] else item_main['total_addon']
           jenis_pembayaran_main = item_main['jenis_pembayaran']
           disc_main = item_main['disc']
