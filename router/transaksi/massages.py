@@ -1,5 +1,6 @@
 import asyncio
 import json
+import math
 import traceback
 from typing import Optional
 import uuid
@@ -332,7 +333,7 @@ async def pelunasan(
           jlh_kembali_main = rSelect[4]
           pajak = rSelect[5]
 
-          nominal_pjk_addon = total_addon * pajak
+          nominal_pjk_addon = math.ceil(total_addon * pajak)
           total_addon += nominal_pjk_addon # ini sudah plus pajak
 
           # Jika ganti paket
