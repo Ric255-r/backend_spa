@@ -321,9 +321,9 @@ async def storeAddOn(
             """
             await cursor.execute(q4, (id_trans, new_id_dt, 'pending', 1, id_batch))
 
-            q3 = "UPDATE menu_fnb SET stok_fnb = stok_fnb - %s where id_fnb = %s"
+            q_kurangstok = "UPDATE menu_fnb SET stok_fnb = stok_fnb - %s where id_fnb = %s"
 
-            await cursor.execute(q3, (item['jlh'], item['id_fnb'],))
+            await cursor.execute(q_kurangstok, (item['jlh'], item['id_fnb'],))
         
           qSelectAddOn = "SELECT total_addon, jenis_pembayaran, disc FROM main_transaksi WHERE id_transaksi = %s"
           await cursor.execute(qSelectAddOn, (id_trans, ))
