@@ -212,10 +212,14 @@ async def storeData(
                       """
                       await cursor.execute(q_update, (qty, qty, id_member_kunjungan, kode_promo_kunjungan))
                 promo_index_store["promo_key"] = promo_index + 1
+<<<<<<< HEAD
                 # print("About to commit transaction")
                 # await conn.commit()
                 # # print("About to commit transaction")
                 # # await conn.commit()
+=======
+              
+>>>>>>> 533f2b789f1e1c4b9852fe42db36e9904eb05c3d
           # false = awal
           if jenis_pembayaran == False:
             #Query Masukin ke Transaksi
