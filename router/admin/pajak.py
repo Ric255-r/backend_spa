@@ -18,17 +18,21 @@ async def getpajak():
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
 
-        q1 = "SELECT pajak FROM pajak"
+        q1 = "SELECT * FROM pajak"
         await cursor.execute(q1)
 
-        row = await cursor.fetchone()
-        return row[0]  # or just: return row[0] if appropriate
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
 
   except Exception as e:
     return JSONResponse({"Error Latest Trans": str(e)}, status_code=500)
 
-from fastapi import Request, APIRouter
-from fastapi.responses import JSONResponse
 
 @app.put('/updatepajak')
 async def updatepajak(request: Request):
@@ -42,12 +46,13 @@ async def updatepajak(request: Request):
 
                     # Get JSON body
                     data = await request.json()
-                    pajak = data.get('pajak')  # example: 0.35
+                    pajakmsg = data.get('pajak_msg')
+                    pajakfnb = data.get('pajak_fnb') 
                     id = 1  # hardcoded for now, you can replace with dynamic value
 
                     # Execute update query
-                    q1 = "UPDATE pajak SET pajak = %s WHERE id = %s"
-                    await cursor.execute(q1, (pajak, id))
+                    q1 = "UPDATE pajak SET pajak_msg = %s, pajak_fnb = %s WHERE id = %s"
+                    await cursor.execute(q1, (pajakmsg, pajakfnb, id))
 
                     await conn.commit()
                     return {"status": "success"}

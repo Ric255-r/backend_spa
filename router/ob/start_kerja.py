@@ -120,6 +120,11 @@ async def doneKerja(
           """
           await cursor.execute(q1, (data['jam_selesai'], data['id_laporan'], data['id_karyawan'], ))
 
+          q2 = """
+            UPDATE ruangan SET status = %s WHERE id_ruangan = %s
+
+          """
+          await cursor.execute(q2, (data['status'], data['id_ruangan'],))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
