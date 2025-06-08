@@ -160,13 +160,15 @@ async def storeData(
               UPDATE main_transaksi
               SET
                 no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
-                grand_total = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
+                grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, 
+                metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
                 nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
               -1, 'fnb', data['total_harga'], data['disc'], 
-              data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
+              data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'], 
+              data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
               data['nama_bank'], data['jumlah_bayar'], 0, 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
@@ -176,14 +178,16 @@ async def storeData(
               UPDATE main_transaksi
               SET
                 no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
-                grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
+                grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, 
+                metode_pembayaran = %s, jumlah_bayar = %s, 
                 jumlah_kembalian = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
               -1, 'fnb', data['total_harga'], data['disc'], 
-              data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
-              data['jumlah_bayar'] - data['grand_total'], 'paid',
+              data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'], 
+              data['metode_pembayaran'], data['jumlah_bayar'], 
+              data['jumlah_bayar'] - data['gtotal_stlh_pajak'], 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 
