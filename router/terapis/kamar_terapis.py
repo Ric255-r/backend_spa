@@ -246,6 +246,9 @@ async def getLatestTrans(
 
           items2 = await cursor.fetchall()
 
+          print ('isi paket :', items)
+          print('isi paket 2:', items2)
+
           # kalo items hanya return single row, lapis make [] krn pake fetchone, klo fetchall g ush lapis.
           df2 = pd.DataFrame(items2, columns=column_names)
           # utk return data. ambil index ke-0 krn dia return dalam bentuk list/array

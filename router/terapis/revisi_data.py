@@ -194,7 +194,6 @@ async def addon(
           id_trans = data['id_transaksi']
 
           details = data.get('detail_trans', [])
-          print('detail adalah :', details)
           total_addon = 0
           total_durasi_global = 0
           for item in details:
@@ -219,6 +218,11 @@ async def addon(
                 (new_id_dt, id_trans, item['id_paket_msg'], item['jlh'], item['satuan'], item['durasi_awal'],
                 total_durasi, item['harga_paket_msg'], item['harga_total'], item['status'], item['is_addon'])
               )
+
+              q3 = "UPDATE menu_produk SET stok_produk = stok_produk - %s where id_produk = %s"
+
+              await cursor.execute(q3, (item['jlh'], item['id_paket_msg'],))
+
             else:
               total_durasi = item['jlh'] * item['durasi_awal']
               total_durasi_global += total_durasi
@@ -244,7 +248,6 @@ async def addon(
             print('nama paket', nama_paket)
               
             if item['harga_paket_msg'] == 0:
-
                 q_check = """
                     SELECT DISTINCT dtm.id_member, dtm.kode_promo 
                     FROM detail_transaksi_member dtm
@@ -263,7 +266,7 @@ async def addon(
             else :
               print('id member not fetched')
             
-            if item['harga_paket_msg'] == 0 and id_member['id_member'] and id_member['id_member'].strip() != "":
+            if item['harga_paket_msg'] == 0 and id_member['id_member'] and id_member['id_member'].strip() != "" and item['satuan'].lower() != 'pcs':
                 q_check = """
                     SELECT DISTINCT dtm.id_member, dtm.kode_promo, dtm.sisa_kunjungan
                     FROM detail_transaksi_member dtm
