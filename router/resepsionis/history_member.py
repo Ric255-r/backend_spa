@@ -179,11 +179,7 @@ async def get_member_detail(id_member: str):
 
                 # Build full URL (adjust the base URL as needed)
                 qr_filename = os.path.basename(id_gelang)
-<<<<<<< HEAD
                 base_url = "http://192.168.1.25:5500"  # Change this to your IP or domain
-=======
-                base_url = "http://192.168.1.16:5500"  # Change this to your IP or domain
->>>>>>> f61174577217dba071d63bfa5fe39c2383677a94
                 qr_url = f"{base_url}/qrcodes/{qr_filename}"
 
                 return JSONResponse(status_code=200, content={
