@@ -31,13 +31,13 @@ async def getIdKaryawan(jabatan: str):  # Accept 'category' as a parameter
 
         # Map the categories to their prefixes
         prefix_mapping = {
-            "Terapis": "T",
-            "Resepsionis": "R",
-            "Supervisor": "S",
-            "Office Boy": "O",
-            "Admin": "A",
-            "Kitchen": "K",
-            "GRO": "G",
+            "terapis": "T",
+            "resepsionis": "R",
+            "supervisor": "S",
+            "office boy": "O",
+            "admin": "A",
+            "kitchen": "K",
+            "gro": "G",
         }
 
         # Get the prefix for the selected category
@@ -83,7 +83,8 @@ async def postPekerja(
     no_hp: str = Form(...),
     jabatan: str = Form(...),
     status: str = Form(...),
-    kontrak_img: List[UploadFile] = File(...)
+    kontrak_img: Optional[List[UploadFile]] = File(None)
+
 ):
     try:
         pool = await get_db()
@@ -93,20 +94,18 @@ async def postPekerja(
                     await conn.begin()
 
                     filenames = []
-                    for file in kontrak_img:
-                        # Generate unique filename with original extension
-                        filename = f"{uuid.uuid4()}_{file.filename}"
-                        file_path = Path(KONTRAK_DIR) / filename
+                    if kontrak_img:  # ⬅️ Add this check
+                        for file in kontrak_img:
+                            filename = f"{uuid.uuid4()}_{file.filename}"
+                            file_path = Path(KONTRAK_DIR) / filename
 
-                        # Save file asynchronously
-                        async with aiofiles.open(file_path, 'wb') as out_file:
-                            content = await file.read()
-                            await out_file.write(content)
+                            async with aiofiles.open(file_path, 'wb') as out_file:
+                                content = await file.read()
+                                await out_file.write(content)
 
-                        filenames.append(filename)
+                            filenames.append(filename)
 
-                    # Store filenames (comma-separated or as JSON)
-                    kontrak_str = ",".join(filenames)  # or json.dumps(filenames)
+                    kontrak_str = ",".join(filenames) if filenames else ""
 
                     # Insert into DB
                     q1 = """
@@ -137,125 +136,174 @@ async def postPekerja(
             content={"status": "Error", "message": f"Koneksi Error: {str(e)}"},
             status_code=500
         )
-
-# @app.post('/post_pekerja')
-# async def postPekerja(
-#   request: Request
-# ):
-#   try:
-#     pool = await get_db()
-
-#     async with pool.acquire() as conn:
-#       async with conn.cursor() as cursor:
-#         try:
-#           # 1. Start Transaction
-#           await conn.begin()
-
-#           # 2. Execute querynya
-#           data = await request.json()
-#           q1 = """
-#             INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img) 
-#             VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)
-#           """
-#           await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['jabatan'], data['status'],  data['kontrak_img'])) 
-#           # 3. Klo Sukses, dia bkl save ke db
-#           await conn.commit()
-
-#           return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
-#         except aiomysqlerror as e:
-#           # Rollback Input Jika Error
-
-#           # Ambil Error code
-#           error_code = e.args[0] if e.args else "Unknown"
-          
-#           await conn.rollback()
-#           return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
-        
-#         except Exception as e:
-#           await conn.rollback()
-#           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
-        
-#   except Exception as e:
-#     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
   
 @app.post('/post_ob')
 async def postOb(
-  request: Request
+    id_karyawan: str = Form(...),
+    nik: str = Form(...),
+    nama_karyawan: str = Form(...),
+    alamat: str = Form(...),
+    jk: str = Form(...),
+    no_hp: str = Form(...),
+    jabatan: str = Form(...),
+    status: str = Form(...),
+    senin: int = Form(...),
+    selasa: int = Form(...),
+    rabu: int = Form(...),
+    kamis: int = Form(...),
+    jumat: int = Form(...),
+    sabtu: int = Form(...),
+    minggu: int = Form(...),
+    kontrak_img: List[UploadFile] = File(None)  # Make it optional
 ):
-  try:
-    pool = await get_db()
+    try:
+        pool = await get_db()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                try:
+                    await conn.begin()
 
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        try:
-          # 1. Start Transaction
-          await conn.begin()
+                    filenames = []
 
-          # 2. Execute querynya
-          data = await request.json()
-          q1 = "INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-          await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['jabatan'], data['status'], data['kontrak_img'])) 
-          q2 = "INSERT INTO hari_kerja_ob (kode_ob, senin, selasa, rabu, kamis, jumat, sabtu, minggu) VALUES(%s, %s, %s, %s, %s, %s, %s, %s)"
-          await cursor.execute(q2, (data['id_karyawan'], data['senin'], data['selasa'], data['rabu'], data['kamis'], data['jumat'], data['sabtu'], data['minggu']))
-          # 3. Klo Sukses, dia bkl save ke db
-          await conn.commit()
+                    if kontrak_img:
+                        for file in kontrak_img:
+                            if not file.filename:
+                                continue
 
-          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
-        except aiomysqlerror as e:
-          # Rollback Input Jika Error
+                            filename = f"{uuid.uuid4()}_{file.filename}"
+                            file_path = Path(KONTRAK_DIR) / filename
 
-          # Ambil Error code
-          error_code = e.args[0] if e.args else "Unknown"
-          
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
-        
-        except Exception as e:
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
-        
-  except Exception as e:
-    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+                            async with aiofiles.open(file_path, 'wb') as out_file:
+                                content = await file.read()
+                                await out_file.write(content)
+
+                            filenames.append(filename)
+
+                    kontrak_str = ",".join(filenames) if filenames else None
+
+                    # Insert into karyawan
+                    q1 = """
+                        INSERT INTO karyawan 
+                        (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(q1, (
+                        id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_str
+                    ))
+
+                    # Insert into hari_kerja_ob
+                    q2 = """
+                        INSERT INTO hari_kerja_ob 
+                        (kode_ob, senin, selasa, rabu, kamis, jumat, sabtu, minggu)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(q2, (
+                        id_karyawan, senin, selasa, rabu, kamis, jumat, sabtu, minggu
+                    ))
+
+                    await conn.commit()
+
+                    return JSONResponse(
+                        content={"status": "Success", "message": "Data Berhasil Diinput"},
+                        status_code=200
+                    )
+
+                except Exception as e:
+                    await conn.rollback()
+                    return JSONResponse(
+                        content={"status": "Error", "message": f"Server Error: {e}"},
+                        status_code=500
+                    )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"status": "Error", "message": f"Koneksi Error: {str(e)}"},
+            status_code=500
+        )
   
 @app.post('/post_terapis')
 async def postTerapis(
-  request: Request
+    id_karyawan: str = Form(...),
+    nik: str = Form(...),
+    nama_karyawan: str = Form(...),
+    alamat: str = Form(...),
+    jk: str = Form(...),
+    no_hp: str = Form(...),
+    jabatan: str = Form(...),
+    status: str = Form(...),
+    senin: int = Form(...),
+    selasa: int = Form(...),
+    rabu: int = Form(...),
+    kamis: int = Form(...),
+    jumat: int = Form(...),
+    sabtu: int = Form(...),
+    minggu: int = Form(...),
+    kontrak_img: List[UploadFile] = File(None)  # Optional upload
 ):
-  try:
-    pool = await get_db()
+    try:
+        pool = await get_db()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                try:
+                    await conn.begin()
 
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        try:
-          # 1. Start Transaction
-          await conn.begin()
+                    filenames = []
 
-          # 2. Execute querynya
-          data = await request.json()
-          q1 = "INSERT INTO karyawan (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-          await cursor.execute(q1, (data['id_karyawan'], data['nik'], data['nama_karyawan'], data['alamat'], data['jk'], data['no_hp'], data['jabatan'], data['status'],  data['kontrak_img'])) 
-          q2 = "INSERT INTO hari_kerja_terapis (kode_terapis, senin, selasa, rabu, kamis, jumat, sabtu, minggu) VALUES(%s, %s, %s, %s, %s, %s, %s, %s)"
-          await cursor.execute(q2, (data['id_karyawan'], data['senin'], data['selasa'], data['rabu'], data['kamis'], data['jumat'], data['sabtu'], data['minggu']))
-          # 3. Klo Sukses, dia bkl save ke db
-          await conn.commit()
+                    if kontrak_img:
+                        for file in kontrak_img:
+                            if not file.filename:
+                                continue
 
-          return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
-        except aiomysqlerror as e:
-          # Rollback Input Jika Error
+                            filename = f"{uuid.uuid4()}_{file.filename}"
+                            file_path = Path(KONTRAK_DIR) / filename
 
-          # Ambil Error code
-          error_code = e.args[0] if e.args else "Unknown"
-          
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
-        
-        except Exception as e:
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
-        
-  except Exception as e:
-    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
-  
+                            async with aiofiles.open(file_path, 'wb') as out_file:
+                                content = await file.read()
+                                await out_file.write(content)
+
+                            filenames.append(filename)
+
+                    kontrak_str = ",".join(filenames) if filenames else None
+
+                    # Insert into karyawan
+                    q1 = """
+                        INSERT INTO karyawan 
+                        (id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_img)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(q1, (
+                        id_karyawan, nik, nama_karyawan, alamat, jk, no_hp, jabatan, status, kontrak_str
+                    ))
+
+                    # Insert into hari_kerja_terapis
+                    q2 = """
+                        INSERT INTO hari_kerja_terapis 
+                        (kode_terapis, senin, selasa, rabu, kamis, jumat, sabtu, minggu)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(q2, (
+                        id_karyawan, senin, selasa, rabu, kamis, jumat, sabtu, minggu
+                    ))
+
+                    await conn.commit()
+
+                    return JSONResponse(
+                        content={"status": "Success", "message": "Data Berhasil Diinput"},
+                        status_code=200
+                    )
+
+                except Exception as e:
+                    await conn.rollback()
+                    return JSONResponse(
+                        content={"status": "Error", "message": f"Server Error: {e}"},
+                        status_code=500
+                    )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"status": "Error", "message": f"Koneksi Error: {str(e)}"},
+            status_code=500
+        )
 # async def getIdKaryawan():
 #   try:
 #     pool = await get_db() # Get The pool
