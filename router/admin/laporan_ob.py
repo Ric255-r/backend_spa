@@ -29,6 +29,8 @@ async def getLaporanOb():
                     SELECT lo.*, DATE_FORMAT(lo.created_at, '%d/%m/%Y') AS formatted_date, r.nama_ruangan 
                     FROM laporan_ob lo 
                     INNER JOIN ruangan r ON lo.id_ruangan = r.id_ruangan
+                    WHERE (lo.laporan IS NOT NULL AND lo.laporan != '')
+                    OR (lo.foto_laporan IS NOT NULL AND lo.foto_laporan != '')
                 """
                 await cursor.execute(q1)
                 items = await cursor.fetchall()
