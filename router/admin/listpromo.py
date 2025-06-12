@@ -33,17 +33,7 @@ async def getdatapromohappyhour() :
           FROM promo a 
           INNER JOIN detail_promo_happyhour b 
             ON a.detail_kode_promo = b.detail_kode_promo 
-          WHERE 
-            CURTIME() BETWEEN b.jam_mulai AND b.jam_selesai
-            AND CASE DAYOFWEEK(CURDATE())
-              WHEN 1 THEN b.minggu
-              WHEN 2 THEN b.senin
-              WHEN 3 THEN b.selasa
-              WHEN 4 THEN b.rabu
-              WHEN 5 THEN b.kamis
-              WHEN 6 THEN b.jumat
-              WHEN 7 THEN b.sabtu
-            END = 1
+          
           ORDER BY a.kode_promo ASC
             """
         await cursor.execute(q1)  
@@ -58,7 +48,17 @@ async def getdatapromohappyhour() :
   except HTTPException as e:
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
 
-
+# WHERE 
+#             CURTIME() BETWEEN b.jam_mulai AND b.jam_selesai
+#             AND CASE DAYOFWEEK(CURDATE())
+#               WHEN 1 THEN b.minggu
+#               WHEN 2 THEN b.senin
+#               WHEN 3 THEN b.selasa
+#               WHEN 4 THEN b.rabu
+#               WHEN 5 THEN b.kamis
+#               WHEN 6 THEN b.jumat
+#               WHEN 7 THEN b.sabtu
+#             END = 1
 @app.put('/updatepromohappyhour')
 async def updatepromohappyhour(
   request: Request
