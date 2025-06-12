@@ -212,6 +212,7 @@ async def storeData(
                       """
                       await cursor.execute(q_update, (qty, qty, id_member_kunjungan, kode_promo_kunjungan))
                 promo_index_store["promo_key"] = promo_index + 1
+                
           # false = awal
           if jenis_pembayaran == False:
             #Query Masukin ke Transaksi
@@ -328,23 +329,26 @@ async def pelunasan(
           # rSelect = result select
           rSelect = await cursor.fetchone()
           main_grand_total = rSelect[0] # tanpa pajak
-          grand_total = rSelect[1] # ini gtotal_stlh_pajak
+          gtotal_stlh_pajak = rSelect[1] # ini gtotal_stlh_pajak
           total_addon = rSelect[2]
           jlh_byr_main = rSelect[3]
           jlh_kembali_main = rSelect[4]
           pajak = rSelect[5]
 
-          nominal_pjk_addon = math.ceil(total_addon * pajak)
-          total_addon += nominal_pjk_addon # ini sudah plus pajak
+          nominal_pjk_addon = total_addon * pajak
+          # ini sudah plus pajak, blm bulat
+          addon_pjk_sblm_round = total_addon + nominal_pjk_addon
+          # plus pajak & bulat
+          total_addon = round(addon_pjk_sblm_round / 1000) * 1000
 
           # Jika ganti paket
           if jlh_byr_main > 0:
             sum_jlh_byr = jlh_byr_main - jlh_kembali_main + jlh_bayar_pelunasan
           else:
-            sum_jlh_byr = grand_total + total_addon
+            sum_jlh_byr = gtotal_stlh_pajak + total_addon
 
           # # Balikin harga ke sblm pajak utk grandtotal no pajak
-          # nominal_sblm_pjk = (grand_total + total_addon) * float(pajak)
+          # nominal_sblm_pjk = (gtotal_stlh_pajak + total_addon) * float(pajak)
           gtotal_non_pajak = (main_grand_total + total_addon - nominal_pjk_addon) 
 
           if metode_bayar == "debit" or metode_bayar == "qris":
@@ -358,7 +362,7 @@ async def pelunasan(
               status = %s, nama_akun = %s, no_rek = %s, nama_bank = %s
               WHERE id_transaksi = %s
             """
-            await cursor.execute(q2, (gtotal_non_pajak, grand_total + total_addon, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, id_trans))
+            await cursor.execute(q2, (gtotal_non_pajak, gtotal_stlh_pajak + total_addon, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, id_trans))
           # else bayar cash
           else:
             q2 = """
@@ -366,7 +370,7 @@ async def pelunasan(
               jumlah_bayar = %s, jumlah_kembalian = 0,
               status = %s WHERE id_transaksi = %s
             """
-            await cursor.execute(q2, (gtotal_non_pajak, grand_total + total_addon, 0, sum_jlh_byr, 'done', id_trans))
+            await cursor.execute(q2, (gtotal_non_pajak, gtotal_stlh_pajak + total_addon, 0, sum_jlh_byr, 'done', id_trans))
 
           q3 = """
             UPDATE detail_transaksi_produk SET status = 'paid' WHERE id_transaksi = %s
