@@ -53,7 +53,7 @@ async def getDataTerapis():
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
-        q1 = "SELECT * FROM karyawan WHERE (jabatan = %s or id_karyawan LIKE %s) AND status = 'Aktif'"
+        q1 = "SELECT * FROM karyawan WHERE (jabatan = %s or id_karyawan LIKE %s) AND status = 'aktif'"
         await cursor.execute(q1, ("terapis", "T%"))
 
         items = await cursor.fetchall()
@@ -77,7 +77,7 @@ async def getDataTerapisRolling():
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         q1 = "SELECT k.*, a.jam_absen FROM karyawan k JOIN absensi_terapis a ON k.id_karyawan = a.id_karyawan WHERE k.jabatan = %s OR k.id_karyawan LIKE %s ORDER BY a.jam_absen ASC;"
-        await cursor.execute(q1, ("Terapis", "T%"))
+        await cursor.execute(q1, ("terapis", "T%"))
 
         items = await cursor.fetchall()
 

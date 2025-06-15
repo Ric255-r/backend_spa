@@ -27,7 +27,8 @@ async def getdatapromohappyhour() :
             b.senin, b.selasa, b.rabu, b.kamis, b.jumat, b.sabtu, b.minggu,
             TIME_FORMAT(b.jam_mulai, '%H:%i') AS jam_mulai, 
             TIME_FORMAT(b.jam_selesai, '%H:%i') AS jam_selesai, 
-            b.disc, 
+            b.disc,
+            b.umum, 
             b.member, 
             b.vip 
           FROM promo a 
@@ -47,18 +48,68 @@ async def getdatapromohappyhour() :
         return df.to_dict('records')
   except HTTPException as e:
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
+  
+@app.get('/getdatapromohappyhourdisc')
+async def getdatapromohappyhourdisc(statusTamu: str = None):
+    try:
+        pool = await get_db()
 
-# WHERE 
-#             CURTIME() BETWEEN b.jam_mulai AND b.jam_selesai
-#             AND CASE DAYOFWEEK(CURDATE())
-#               WHEN 1 THEN b.minggu
-#               WHEN 2 THEN b.senin
-#               WHEN 3 THEN b.selasa
-#               WHEN 4 THEN b.rabu
-#               WHEN 5 THEN b.kamis
-#               WHEN 6 THEN b.jumat
-#               WHEN 7 THEN b.sabtu
-#             END = 1
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+                # Determine filter based on statusTamu
+                filter_by_status = ""
+                if statusTamu == "Umum":
+                    filter_by_status = "AND b.umum = 1"
+                elif statusTamu == "Member":
+                    filter_by_status = "AND b.member = 1"
+                elif statusTamu == "VIP":
+                    filter_by_status = "AND b.vip = 1"
+
+                q1 = f"""
+                    SELECT 
+                      a.kode_promo, 
+                      a.nama_promo, 
+                      b.detail_kode_promo, 
+                      b.senin, b.selasa, b.rabu, b.kamis, b.jumat, b.sabtu, b.minggu,
+                      TIME_FORMAT(b.jam_mulai, '%H:%i') AS jam_mulai, 
+                      TIME_FORMAT(b.jam_selesai, '%H:%i') AS jam_selesai, 
+                      b.disc, 
+                      b.umum,
+                      b.member, 
+                      b.vip 
+                    FROM promo a 
+                    INNER JOIN detail_promo_happyhour b 
+                      ON a.detail_kode_promo = b.detail_kode_promo 
+                    WHERE 
+                      CURTIME() BETWEEN b.jam_mulai AND b.jam_selesai
+                      AND CASE DAYOFWEEK(CURDATE())
+                        WHEN 1 THEN b.minggu
+                        WHEN 2 THEN b.senin
+                        WHEN 3 THEN b.selasa
+                        WHEN 4 THEN b.rabu
+                        WHEN 5 THEN b.kamis
+                        WHEN 6 THEN b.jumat
+                        WHEN 7 THEN b.sabtu
+                      END = 1
+                      {filter_by_status}
+                    ORDER BY a.kode_promo ASC
+                """
+
+                await cursor.execute(q1)
+
+                items = await cursor.fetchall()
+                kolom_menu = [kolom[0] for kolom in cursor.description]
+                df = pd.DataFrame(items, columns=kolom_menu)
+
+                return df.to_dict('records')
+
+    except HTTPException as e:
+        return JSONResponse({"Error": str(e)}, status_code=e.status_code)
+
+
+
 @app.put('/updatepromohappyhour')
 async def updatepromohappyhour(
   request: Request
@@ -76,8 +127,8 @@ async def updatepromohappyhour(
           data = await request.json()
           q1 = "UPDATE promo SET nama_promo = %s, updated_at =%s WHERE kode_promo = %s"
           await cursor.execute(q1, (data['nama_promo'], datetime.now(),data['kode_promo']))
-          q2 = "UPDATE detail_promo_happyhour SET senin = %s, selasa = %s, rabu = %s, kamis = %s, jumat = %s, sabtu = %s, minggu = %s,disc = %s, jam_mulai = %s, jam_selesai = %s, member = %s, vip = %s, updated_at = %s WHERE detail_kode_promo = %s"
-          await cursor.execute(q2, (int(data['senin']),int(data['selasa']),int(data['rabu']),int(data['kamis']),int(data['jumat']),int(data['sabtu']),int(data['minggu']),data['disc'],data['jam_mulai'],data['jam_selesai'],data['member'],data['vip'],datetime.now(),data['detail_kode_promo']))
+          q2 = "UPDATE detail_promo_happyhour SET senin = %s, selasa = %s, rabu = %s, kamis = %s, jumat = %s, sabtu = %s, minggu = %s,disc = %s, jam_mulai = %s, jam_selesai = %s, umum = %s, member = %s, vip = %s, updated_at = %s WHERE detail_kode_promo = %s"
+          await cursor.execute(q2, (int(data['senin']),int(data['selasa']),int(data['rabu']),int(data['kamis']),int(data['jumat']),int(data['sabtu']),int(data['minggu']),data['disc'],data['jam_mulai'],data['jam_selesai'],data['umum'],data['member'],data['vip'],datetime.now(),data['detail_kode_promo']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
