@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, Query, Depends, File, Form, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -56,7 +57,7 @@ async def storeData(
     pool = await get_db()
 
     async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
         try:
           # 1. Start Transaction
           await conn.begin()
@@ -77,6 +78,12 @@ async def storeData(
             # new_id_dt = "DT" + str(milliseconds_local).zfill(16)
           new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
 
+          q1 = """
+            SELECT * FROM pajak LIMIT 1
+          """
+          await cursor.execute(q1)
+          item_q1 = await cursor.fetchone()
+
           q2 = """
               INSERT INTO detail_transaksi_fasilitas(
                 id_detail_transaksi, id_transaksi, id_fasilitas, qty, satuan, harga, status
@@ -87,6 +94,10 @@ async def storeData(
             """
           await cursor.execute(q2, (new_id_dt, data['id_transaksi'], data['id_fasilitas'], 1, 'Paket', data['harga'], status_trans))
 
+          nominal_pjk = data['grand_total'] * item_q1['pajak_msg']
+          gtotal_pjk_blm_round = data['grand_total'] + nominal_pjk
+          gtotal_stlh_pajak = round(gtotal_pjk_blm_round / 1000) * 1000
+
           # false = awal
           if jenis_pembayaran == False:
             #Query Masukin ke Transaksi
@@ -95,14 +106,14 @@ async def storeData(
                 UPDATE main_transaksi
                 SET
                   jenis_transaksi = %s, id_member = %s, no_hp = %s, nama_tamu = %s, total_harga = %s, disc = %s, 
-                  grand_total = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
+                  grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
                   nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
                 'Fasilitas', data.get('id_member'), data['no_hp'], data['nama_tamu'], data['total_harga'], 0, 
-                data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
-                data['nama_bank'], data['jumlah_bayar'], 0, jenis_pembayaran, status_trans,
+                data['grand_total'], item_q1['pajak_msg'], gtotal_stlh_pajak, data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
+                data['nama_bank'], gtotal_stlh_pajak, 0, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
               ))
             # Metode Bayar Cash
@@ -111,14 +122,14 @@ async def storeData(
                 UPDATE main_transaksi
                 SET
                   jenis_transaksi = %s, id_member = %s, no_hp = %s, nama_tamu = %s, total_harga = %s, disc = %s, 
-                  grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
+                  grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
                   jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
                 'fasilitas', data.get('id_member') or '', data.get('no_hp') or '0', data['nama_tamu'], data['total_harga'], 0, 
-                data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
-                data['jumlah_bayar'] - data['grand_total'], jenis_pembayaran, status_trans,
+                data['grand_total'], item_q1['pajak_msg'], gtotal_stlh_pajak, data['metode_pembayaran'], data['jumlah_bayar'], 
+                data['jumlah_bayar'] - gtotal_stlh_pajak, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
               ))
           
@@ -128,13 +139,13 @@ async def storeData(
               UPDATE main_transaksi
               SET
                 jenis_transaksi = %s, total_harga = %s, disc = %s, 
-                grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, jumlah_kembalian = %s, 
+                grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, metode_pembayaran = %s, jumlah_bayar = %s, jumlah_kembalian = %s, 
                 jenis_pembayaran = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
               'fasilitas', data['total_harga'], 0, 
-              data['grand_total'], "-", 0, 0, jenis_pembayaran,  status_trans,
+              data['grand_total'], item_q1['pajak_msg'], gtotal_stlh_pajak, "-", 0, 0, jenis_pembayaran,  status_trans,
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
           # Klo Sukses, dia bkl save ke db
