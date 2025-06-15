@@ -248,4 +248,25 @@ async def cariPekerja(
     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
 
+@app.get('/dataTampilanTerapis')
+async def getDataGro():
+  try:
+    pool = await get_db() # Get The pool
 
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        q1 = "SELECT * FROM karyawan WHERE (jabatan = %s or id_karyawan LIKE %s) AND status = 'aktif' ORDER BY is_occupied ASC" 
+        await cursor.execute(q1, ("terapis", "T%",))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data GRO": str(e)}, status_code=500)
