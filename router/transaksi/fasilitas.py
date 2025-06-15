@@ -111,7 +111,7 @@ async def storeData(
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'Fasilitas', data.get('id_member'), data['no_hp'], data['nama_tamu'], data['total_harga'], 0, 
+                'Fasilitas', data.get('id_member'), data['no_hp'], data['nama_tamu'], data['total_harga'], data['disc'], 
                 data['grand_total'], item_q1['pajak_msg'], gtotal_stlh_pajak, data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
                 data['nama_bank'], gtotal_stlh_pajak, 0, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -127,7 +127,7 @@ async def storeData(
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'fasilitas', data.get('id_member') or '', data.get('no_hp') or '0', data['nama_tamu'], data['total_harga'], 0, 
+                'fasilitas', data.get('id_member') or '', data.get('no_hp') or '0', data['nama_tamu'], data['total_harga'], data['disc'], 
                 data['grand_total'], item_q1['pajak_msg'], gtotal_stlh_pajak, data['metode_pembayaran'], data['jumlah_bayar'], 
                 data['jumlah_bayar'] - gtotal_stlh_pajak, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -144,7 +144,7 @@ async def storeData(
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
-              'fasilitas', data['total_harga'], 0, 
+              'fasilitas', data['total_harga'], data['disc'], 
               data['grand_total'], item_q1['pajak_msg'], gtotal_stlh_pajak, "-", 0, 0, jenis_pembayaran,  status_trans,
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
