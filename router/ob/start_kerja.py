@@ -285,7 +285,7 @@ async def getMenu():
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
 
-        q1 = "SELECT nama_ruangan FROM kerja_ob_sementara"
+        q1 = "SELECT id, nama_ruangan, keterangan FROM kerja_ob_sementara"
         await cursor.execute(q1)
 
         items = await cursor.fetchall()
@@ -315,8 +315,8 @@ async def deletefnb(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "DELETE FROM kerja_ob_sementara WHERE nama_ruangan = %s"
-          await cursor.execute(q1, (data['nama_ruangan']))
+          q1 = "DELETE FROM kerja_ob_sementara WHERE id = %s"
+          await cursor.execute(q1, (data['id']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
