@@ -88,8 +88,8 @@ async def postpromohappyhour(
           q1 = "INSERT INTO promo(kode_promo,nama_promo,detail_kode_promo) VALUES(%s, %s, %s)"
           await cursor.execute(q1, (data['kode_promo'],data['nama_promo'],lastiddetailpromo))
 
-          q2 = "INSERT INTO detail_promo_happyhour(detail_kode_promo,senin,selasa,rabu,kamis,jumat,sabtu,minggu,jam_mulai,jam_selesai,disc,member,vip) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-          await cursor.execute(q2, (lastiddetailpromo,data['senin'],data['selasa'],data['rabu'],data['kamis'],data['jumat'],data['sabtu'],data['minggu'],data['jam_mulai'],data['jam_selesai'],data['disc'],data['member'],data['vip']))
+          q2 = "INSERT INTO detail_promo_happyhour(detail_kode_promo,senin,selasa,rabu,kamis,jumat,sabtu,minggu,jam_mulai,jam_selesai,disc,umum,member,vip) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+          await cursor.execute(q2, (lastiddetailpromo,data['senin'],data['selasa'],data['rabu'],data['kamis'],data['jumat'],data['sabtu'],data['minggu'],data['jam_mulai'],data['jam_selesai'],data['disc'],data['umum'],data['member'],data['vip']))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
