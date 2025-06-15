@@ -2,6 +2,7 @@ import json
 import time
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, Depends, File, Form, Query, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -268,7 +269,7 @@ async def getFood(
         finally:
           if cursor:
             await cursor.close()
-        
+  
 
   except Exception as e:
     return JSONResponse(content={"status":"error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
@@ -375,3 +376,22 @@ async def storeAddOn(
         
   except Exception as e:
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+
+@app.get("/latestidTrans/{no_locker}")
+async def get_latest_transaksi_by_locker(no_locker: int):
+    try:
+        pool = await get_db()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("""
+                    SELECT * FROM main_transaksi
+                    WHERE no_loker = %s
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (no_locker,))
+                row = await cursor.fetchone()
+                if row:
+                    return {"id_transaksi": row['id_transaksi']}
+                return JSONResponse(content={"id_transaksi": None}, status_code=200)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
