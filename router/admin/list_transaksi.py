@@ -137,7 +137,7 @@ async def getDataTrans(
     pool = await get_db() # Get The pool
 
     async with pool.acquire() as conn:  # Auto Release
-      async with conn.cursor() as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         q1 = f"""
           SELECT mt.*, COALESCE(r.nama_ruangan, '-') AS nama_ruangan FROM main_transaksi mt 
@@ -146,15 +146,30 @@ async def getDataTrans(
           ORDER BY mt.id_transaksi ASC
         """
         await cursor.execute(q1)
-
         items = await cursor.fetchall()
 
-        column_name = []
-        for kol in cursor.description:
-          column_name.append(kol[0])
-
-        df_main = pd.DataFrame(items, columns=column_name)
-        records = df_main.to_dict('records')
+        q2 = f"""
+          SELECT * FROM pembayaran_transaksi
+          {'WHERE DATE(waktu_bayar) = CURDATE()' if hak_akses == 'resepsionis' else ''}
+          ORDER BY id_transaksi ASC
+        """
+        await cursor.execute(q2)
+        items2 = await cursor.fetchall()
+        data_cash = [item for item in items2 if item['metode_pembayaran'] == 'cash']
+        data_debit = [item for item in items2 if item['metode_pembayaran'] == 'debit']
+        data_qris = [item for item in items2 if item['metode_pembayaran'] == 'qris']
+        
+        omset_cash = 0
+        for data in data_cash:
+          omset_cash += data['jumlah_bayar']
+        
+        omset_debit = 0
+        for data in data_debit:
+          omset_debit += data['jumlah_bayar']
+        
+        omset_qris = 0
+        for data in data_qris:
+          omset_qris += data['jumlah_bayar']
 
         # # Ambil data detail transaksi dari record main
         # detail_ids = []
@@ -232,8 +247,12 @@ async def getDataTrans(
 
         # return records
       
-      return records
-
+      return {
+        "main_data": items,
+        "total_cash": omset_cash,
+        "total_debit": omset_debit,
+        "total_qris": omset_qris,
+      }
 
   except Exception as e:
     return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)

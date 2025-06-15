@@ -33,8 +33,6 @@ async def getpajak():
   except Exception as e:
     return JSONResponse({"Error Latest Trans": str(e)}, status_code=500)
 
-from fastapi import Request, APIRouter
-from fastapi.responses import JSONResponse
 
 @app.put('/updatepajak')
 async def updatepajak(request: Request):

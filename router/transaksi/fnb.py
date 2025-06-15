@@ -2,6 +2,7 @@ import json
 import time
 from typing import Optional
 import uuid
+import aiomysql
 from fastapi import APIRouter, Depends, File, Form, Query, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -160,13 +161,15 @@ async def storeData(
               UPDATE main_transaksi
               SET
                 no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
-                grand_total = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
+                grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, 
+                metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
                 nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
               -1, 'fnb', data['total_harga'], data['disc'], 
-              data['grand_total'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
+              data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'], 
+              data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
               data['nama_bank'], data['jumlah_bayar'], 0, 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
@@ -176,14 +179,16 @@ async def storeData(
               UPDATE main_transaksi
               SET
                 no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
-                grand_total = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
+                grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, 
+                metode_pembayaran = %s, jumlah_bayar = %s, 
                 jumlah_kembalian = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
               -1, 'fnb', data['total_harga'], data['disc'], 
-              data['grand_total'], data['metode_pembayaran'], data['jumlah_bayar'], 
-              data['jumlah_bayar'] - data['grand_total'], 'paid',
+              data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'], 
+              data['metode_pembayaran'], data['jumlah_bayar'], 
+              data['jumlah_bayar'] - data['gtotal_stlh_pajak'], 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 
@@ -264,7 +269,7 @@ async def getFood(
         finally:
           if cursor:
             await cursor.close()
-        
+  
 
   except Exception as e:
     return JSONResponse(content={"status":"error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
@@ -325,12 +330,13 @@ async def storeAddOn(
 
             await cursor.execute(q_kurangstok, (item['jlh'], item['id_fnb'],))
         
-          qSelectAddOn = "SELECT total_addon, jenis_pembayaran, disc FROM main_transaksi WHERE id_transaksi = %s"
+          qSelectAddOn = "SELECT total_addon, jenis_pembayaran, disc, status FROM main_transaksi WHERE id_transaksi = %s"
           await cursor.execute(qSelectAddOn, (id_trans, ))
           item_main = await cursor.fetchone()
           currentTotalAddOn = 0 if not item_main[0] else item_main[0]
           jenis_pembayaran_main = item_main[1]
           disc_main = item_main[2]
+          status_main = item_main[3]
 
           # diskonkan kalo dia payment di akhir. 
           if jenis_pembayaran_main == 1:
@@ -338,7 +344,11 @@ async def storeAddOn(
             total_addon -= disc_nominal_addon
           # end Diskon
 
-          q3 = "UPDATE main_transaksi SET total_addon = %s WHERE id_transaksi = %s"
+          query_status = ""
+          if status_main == "done":
+            query_status = ", status = 'done-unpaid-addon'"
+
+          q3 = f"UPDATE main_transaksi SET total_addon = %s {query_status} WHERE id_transaksi = %s"
           await cursor.execute(q3, (currentTotalAddOn + total_addon, id_trans))
           
           # 3. Klo Sukses, dia bkl save ke db
@@ -371,3 +381,22 @@ async def storeAddOn(
         
   except Exception as e:
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+
+@app.get("/latestidTrans/{no_locker}")
+async def get_latest_transaksi_by_locker(no_locker: int):
+    try:
+        pool = await get_db()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("""
+                    SELECT * FROM main_transaksi
+                    WHERE no_loker = %s
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (no_locker,))
+                row = await cursor.fetchone()
+                if row:
+                    return {"id_transaksi": row['id_transaksi']}
+                return JSONResponse(content={"id_transaksi": None}, status_code=200)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
