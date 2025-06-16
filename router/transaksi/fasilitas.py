@@ -163,7 +163,7 @@ async def storeData(
             data.get('nama_akun', "-"),
             data.get('no_rek', '-'),
             data.get('nama_bank', '-'),
-            data['gtotal_stlh_pajak'],
+            gtotal_stlh_pajak,
             data.get('keterangan', '-'),
           ))
           # Klo Sukses, dia bkl save ke db
