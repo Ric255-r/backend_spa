@@ -351,23 +351,57 @@ async def pelunasan(
           total_addon = rSelect[2]
           jlh_byr_main = rSelect[3]
           jlh_kembali_main = rSelect[4]
-          pajak = rSelect[5]
+          pajak_msg = rSelect[5] #Default Pajak Msg
 
-          nominal_pjk_addon = total_addon * pajak
-          # ini sudah plus pajak, blm bulat
-          addon_pjk_sblm_round = total_addon + nominal_pjk_addon
-          # plus pajak & bulat
-          total_addon = round(addon_pjk_sblm_round / 1000) * 1000
+          # 2. Ambil detail addon untuk hitung pajak per jenis
+          q_addons = """
+            SELECT 
+              dtp.id_detail_transaksi, 'paket' as type, dtp.harga_total
+              FROM detail_transaksi_paket dtp 
+              WHERE dtp.id_transaksi = %s AND dtp.is_addon = 1 AND dtp.is_returned = 0
+            UNION ALL
+            SELECT 
+              dtf.id_detail_transaksi, 'fnb' as type, dtf.harga_total
+              FROM detail_transaksi_fnb dtf 
+              WHERE dtf.id_transaksi = %s AND dtf.is_addon = 1
+            UNION ALL
+            SELECT 
+              dtpr.id_detail_transaksi, 'produk' as type, dtpr.harga_total
+              FROM detail_transaksi_produk dtpr 
+              WHERE dtpr.id_transaksi = %s AND dtpr.is_addon = 1
+          """
+          await cursor.execute(q_addons, (id_trans, id_trans, id_trans))
+          addons = await cursor.fetchall()
+
+          # 3. Hitung total addon dengan pajak yang sesuai
+          total_addon_after_tax = 0
+          for addon in addons:
+            addon_type = addon[1]
+            harga_addon = addon[2]
+            # Gunakan pajak berbeda berdasarkan jenis addon
+            pajak = 0.11 if addon_type == 'fnb' else pajak_msg
+            total_addon_after_tax += harga_addon * (1 + pajak)
+
+          # Bulatkan ke kelipatan 1000
+          total_addon_after_tax = round(total_addon_after_tax / 1000) * 1000
+
+          # nominal_pjk_addon = total_addon * pajak
+          # # ini sudah plus pajak, blm bulat
+          # addon_pjk_sblm_round = total_addon + nominal_pjk_addon
+          # # plus pajak & bulat
+          # total_addon = round(addon_pjk_sblm_round / 1000) * 1000
 
           # Jika ganti paket
           if jlh_byr_main > 0:
             sum_jlh_byr = jlh_byr_main - jlh_kembali_main + jlh_bayar_pelunasan
           else:
-            sum_jlh_byr = gtotal_stlh_pajak + total_addon
+            sum_jlh_byr = gtotal_stlh_pajak + total_addon_after_tax
+            # sum_jlh_byr = gtotal_stlh_pajak + total_addon
+    
 
           # # Balikin harga ke sblm pajak utk grandtotal no pajak
-          # nominal_sblm_pjk = (gtotal_stlh_pajak + total_addon) * float(pajak)
-          gtotal_non_pajak = (main_grand_total + total_addon - nominal_pjk_addon) 
+          # # nominal_sblm_pjk = (gtotal_stlh_pajak + total_addon) * float(pajak)
+          # gtotal_non_pajak = (main_grand_total + total_addon - nominal_pjk_addon) 
 
           if metode_bayar == "debit" or metode_bayar == "qris":
             nama_akun = data['nama_akun']
@@ -380,7 +414,7 @@ async def pelunasan(
               status = %s, nama_akun = %s, no_rek = %s, nama_bank = %s
               WHERE id_transaksi = %s
             """
-            await cursor.execute(q2, (gtotal_non_pajak, gtotal_stlh_pajak + total_addon, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, id_trans))
+            await cursor.execute(q2, (main_grand_total + total_addon, gtotal_stlh_pajak + total_addon_after_tax, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, id_trans))
           # else bayar cash
           else:
             q2 = """
@@ -388,7 +422,7 @@ async def pelunasan(
               jumlah_bayar = %s, jumlah_kembalian = 0,
               status = %s WHERE id_transaksi = %s
             """
-            await cursor.execute(q2, (gtotal_non_pajak, gtotal_stlh_pajak + total_addon, 0, sum_jlh_byr, 'done', id_trans))
+            await cursor.execute(q2, (main_grand_total + total_addon, gtotal_stlh_pajak + total_addon_after_tax, 0, sum_jlh_byr, 'done', id_trans))
 
           qPayment = """
             INSERT INTO pembayaran_transaksi(
