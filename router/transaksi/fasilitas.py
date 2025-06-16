@@ -148,6 +148,24 @@ async def storeData(
               data['grand_total'], item_q1['pajak_msg'], gtotal_stlh_pajak, "-", 0, 0, jenis_pembayaran,  status_trans,
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
+
+          # Ini Harus di store ke pembayaran_transaksi
+          # supaya bisa di sum di list_transaksi
+          qPayment = """
+            INSERT INTO pembayaran_transaksi(
+              id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+            )
+            VALUES(%s, %s, %s, %s, %s, %s, %s)
+          """
+          await cursor.execute(qPayment, (
+            data['id_transaksi'], 
+            data.get('metode_pembayaran', "-"), 
+            data.get('nama_akun', "-"),
+            data.get('no_rek', '-'),
+            data.get('nama_bank', '-'),
+            data['gtotal_stlh_pajak'],
+            data.get('keterangan', '-'),
+          ))
           # Klo Sukses, dia bkl save ke db
           await conn.commit()
 
