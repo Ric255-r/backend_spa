@@ -764,17 +764,18 @@ async def broadcast_update():
   pool = await get_db()
   async with pool.acquire() as conn:
     async with conn.cursor() as cursor:
-      q1 = "SELECT nama_ruangan FROM kerja_ob_sementara ORDER BY id ASC"
+      q1 = "SELECT nama_ruangan, keterangan FROM kerja_ob_sementara ORDER BY id ASC"
       await cursor.execute(q1)
       result = await cursor.fetchall()
+
+  isidata = [{"nama_ruangan": row[0], "keterangan" : row[1]} for row in result]
 
   for websocket in ob_connections:
     await websocket.send_text(
       json.dumps({
-        "nama_ruangan": [row[0] for row in result],
-                })
+        "dataruangan" : isidata})
   ) 
-
+    
 @app.put('/selesai')
 async def selesai(
   request: Request,
@@ -850,8 +851,8 @@ async def selesai(
           namaruangan = item6[0]
           print(namaruangan)
 
-          q7 = "INSERT INTO kerja_ob_sementara (nama_ruangan) VALUES (%s) "
-          await cursor.execute(q7, namaruangan)
+          q7 = "INSERT INTO kerja_ob_sementara (nama_ruangan, keterangan) VALUES (%s,%s) "
+          await cursor.execute(q7, (namaruangan, 'Perlu Dibersihkan'))
 
           await conn.commit() 
 
@@ -940,7 +941,7 @@ async def delete_waktu(
           q4 = "UPDATE karyawan SET is_occupied = FALSE WHERE id_karyawan = %s"
           await cursor.execute(q4, (id_terapis, ))
 
-          q5 = "UPDATE ruangan SET status = 'aktif' WHERE id_ruangan = %s"
+          q5 = "UPDATE ruangan SET status = 'maintenance' WHERE id_ruangan = %s"
           await cursor.execute(q5, (id_ruangan, ))
 
           await conn.commit()
@@ -984,6 +985,43 @@ async def getidmember(
         return df.to_dict('records')
   except HTTPException as e:
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
+  
+@app.put('/panggilob')
+async def panggilob(
+  request : Request
+) :
+  try :
+    pool = await get_db()
 
-  
-  
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        data = await request.json()
+
+        qSelect = f"""
+            SELECT id_ruangan, id_terapis, no_loker, total_addon, status FROM main_transaksi 
+            WHERE id_transaksi = %s
+          """
+        await cursor.execute(qSelect, (data['id_transaksi'], ))
+        items = await cursor.fetchone()
+
+        id_ruangan = items[0]
+
+        q6 = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
+        await cursor.execute(q6, id_ruangan)
+
+        item6 = await cursor.fetchone()
+
+        namaruangan = item6[0]
+        print(namaruangan)
+
+        q7 = "INSERT INTO kerja_ob_sementara (nama_ruangan, keterangan) VALUES (%s, %s) "
+        await cursor.execute(q7, (namaruangan, 'Memanggil anda'))
+
+        await conn.commit() 
+
+        await broadcast_update()
+        return {"status" : "Panggil OB jalan"}
+  except HTTPException as e:
+    return JSONResponse({"Error panggil OB": str(e)}, status_code=e.status_code)
