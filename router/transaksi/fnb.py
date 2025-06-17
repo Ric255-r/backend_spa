@@ -192,6 +192,23 @@ async def storeData(
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 
+          qPayment = """
+            INSERT INTO pembayaran_transaksi(
+              id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+            )
+            VALUES(%s, %s, %s, %s, %s, %s, %s)
+          """
+          await cursor.execute(qPayment, (
+            data['id_transaksi'], 
+            data.get('metode_pembayaran', "-"), 
+            data.get('nama_akun', "-"),
+            data.get('no_rek', '-'),
+            data.get('nama_bank', '-'),
+            data['gtotal_stlh_pajak'],
+            data.get('keterangan', '-'),
+          ))
+            
+
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
