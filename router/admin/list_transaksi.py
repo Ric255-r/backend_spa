@@ -249,6 +249,9 @@ async def getDataTrans(
       
       return {
         "main_data": items,
+        "data_cash": data_cash,
+        "data_debit": data_debit,
+        "data_qris": data_qris,
         "total_cash": omset_cash,
         "total_debit": omset_debit,
         "total_qris": omset_qris,
