@@ -177,6 +177,22 @@ async def storeData(request: Request):
                         WHERE id_transaksi = %(id_transaksi)s
                     """
                     await cursor.execute(q3, q3_values)
+
+                    qPayment = """
+                        INSERT INTO pembayaran_transaksi(
+                        id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+                        )
+                        VALUES(%s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(qPayment, (
+                        data['id_transaksi'], 
+                        data.get('metode_pembayaran', "-"), 
+                        data.get('nama_akun', "-"),
+                        data.get('no_rek', '-'),
+                        data.get('nama_bank', '-'),
+                        data['gtotal_stlh_pajak'],
+                        data.get('keterangan', '-'),
+                    ))
                     
                     await conn.commit()
                     return {"status": "Success", "message": "Payment processed successfully"}
@@ -266,6 +282,22 @@ async def store_tahunan(request: Request):
                         WHERE id_transaksi = %(id_transaksi)s
                     """
                     await cursor.execute(q_update, q_values)
+
+                    qPayment = """
+                        INSERT INTO pembayaran_transaksi(
+                        id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+                        )
+                        VALUES(%s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(qPayment, (
+                        data['id_transaksi'], 
+                        data.get('metode_pembayaran', "-"), 
+                        data.get('nama_akun', "-"),
+                        data.get('no_rek', '-'),
+                        data.get('nama_bank', '-'),
+                        data['gtotal_stlh_pajak'],
+                        data.get('keterangan', '-'),
+                    ))
 
                     await conn.commit()
                     return {"status": "Success", "message": "Tahunan promo applied"}
