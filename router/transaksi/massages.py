@@ -216,7 +216,7 @@ async def storeData(
           # false = awal
           if jenis_pembayaran == False:
             #Query Masukin ke Transaksi
-            if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
+            if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit" or data['metode_pembayaran'] == "kredit":
               q3 = """
                 UPDATE main_transaksi
                 SET
@@ -403,7 +403,7 @@ async def pelunasan(
           # # nominal_sblm_pjk = (gtotal_stlh_pajak + total_addon) * float(pajak)
           # gtotal_non_pajak = (main_grand_total + total_addon - nominal_pjk_addon) 
 
-          if metode_bayar == "debit" or metode_bayar == "qris":
+          if metode_bayar == "debit" or metode_bayar == "qris" or metode_bayar == "kredit":
             nama_akun = data['nama_akun']
             no_rek = data['no_rek']
             nama_bank = data['nama_bank']
@@ -411,10 +411,10 @@ async def pelunasan(
             q2 = """
               UPDATE main_transaksi SET grand_total = %s, gtotal_stlh_pajak = %s, total_addon = %s, 
               jumlah_bayar = %s, jumlah_kembalian = 0,
-              status = %s, nama_akun = %s, no_rek = %s, nama_bank = %s
+              status = %s, nama_akun = %s, no_rek = %s, nama_bank = %s, metode_pembayaran = %s
               WHERE id_transaksi = %s
             """
-            await cursor.execute(q2, (main_grand_total + total_addon, gtotal_stlh_pajak + total_addon_after_tax, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, id_trans))
+            await cursor.execute(q2, (main_grand_total + total_addon, gtotal_stlh_pajak + total_addon_after_tax, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, metode_bayar, id_trans))
           # else bayar cash
           else:
             q2 = """
