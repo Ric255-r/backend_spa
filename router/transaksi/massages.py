@@ -247,6 +247,24 @@ async def storeData(
                 data['jumlah_bayar'] - data['gtotal_stlh_pajak'], jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
               ))
+
+            # Ini Harus di store ke pembayaran_transaksi
+            # supaya bisa di sum di list_transaksi
+            qPayment = """
+              INSERT INTO pembayaran_transaksi(
+                id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+              )
+              VALUES(%s, %s, %s, %s, %s, %s, %s)
+            """
+            await cursor.execute(qPayment, (
+              data['id_transaksi'], 
+              data.get('metode_pembayaran', "-"), 
+              data.get('nama_akun', "-"),
+              data.get('no_rek', '-'),
+              data.get('nama_bank', '-'),
+              data['gtotal_stlh_pajak'],
+              data.get('keterangan', '-'),
+            ))
           
           # else ini unpaid = akhir.
           else:
@@ -264,23 +282,7 @@ async def storeData(
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 
-          # Ini Harus di store ke pembayaran_transaksi
-          # supaya bisa di sum di list_transaksi
-          qPayment = """
-            INSERT INTO pembayaran_transaksi(
-              id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
-            )
-            VALUES(%s, %s, %s, %s, %s, %s, %s)
-          """
-          await cursor.execute(qPayment, (
-            data['id_transaksi'], 
-            data.get('metode_pembayaran', "-"), 
-            data.get('nama_akun', "-"),
-            data.get('no_rek', '-'),
-            data.get('nama_bank', '-'),
-            data['gtotal_stlh_pajak'],
-            data.get('keterangan', '-'),
-          ))
+
             
           # Bikin ruangan dan terapis sedang dipake
           q4 = """

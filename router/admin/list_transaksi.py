@@ -157,6 +157,7 @@ async def getDataTrans(
         items2 = await cursor.fetchall()
         data_cash = [item for item in items2 if item['metode_pembayaran'] == 'cash']
         data_debit = [item for item in items2 if item['metode_pembayaran'] == 'debit']
+        data_kredit = [item for item in items2 if item['metode_pembayaran'] == 'kredit']
         data_qris = [item for item in items2 if item['metode_pembayaran'] == 'qris']
         
         omset_cash = 0
@@ -166,10 +167,18 @@ async def getDataTrans(
         omset_debit = 0
         for data in data_debit:
           omset_debit += data['jumlah_bayar']
+  
+        omset_kredit = 0
+        for data in data_kredit:
+          omset_kredit += data['jumlah_bayar']
         
         omset_qris = 0
         for data in data_qris:
           omset_qris += data['jumlah_bayar']
+
+        q3 = "SELECT NOW() AS tgl"
+        await cursor.execute(q3)
+        dataTgl = await cursor.fetchone()
 
         # # Ambil data detail transaksi dari record main
         # detail_ids = []
@@ -251,10 +260,13 @@ async def getDataTrans(
         "main_data": items,
         "data_cash": data_cash,
         "data_debit": data_debit,
+        "data_kredit": data_kredit,
         "data_qris": data_qris,
         "total_cash": omset_cash,
         "total_debit": omset_debit,
+        "total_kredit": omset_kredit,
         "total_qris": omset_qris,
+        "tgl": dataTgl['tgl']
       }
 
   except Exception as e:
