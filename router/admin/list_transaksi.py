@@ -272,6 +272,51 @@ async def getDataTrans(
   except Exception as e:
     return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
   
+@app.get('/data_terapis/{id_trans}')
+async def get_data_terapis(
+  id_trans: str
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      # wajib tambahi parameter aiomysql.DictCursor untuk buat hasil dalam bentuk dictionary
+      # karena ak filter langsung make for loop yang item['is_addon']
+      # jadi ga usah pake pd.Dataframe lagi
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try: 
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+          q1 = """
+            SELECT 
+              tk.id,
+              tk.id_transaksi,
+              tk.id_terapis,
+              TIME_FORMAT(tk.jam_datang, '%%H:%%i:%%s') as jam_datang,
+              TIME_FORMAT(tk.jam_mulai, '%%H:%%i:%%s') as jam_mulai,
+              TIME_FORMAT(tk.jam_selesai, '%%H:%%i:%%s') as jam_selesai,
+              tk.alasan,
+              tk.created_at,
+              tk.is_tunda,
+              tk.is_cancel,
+              k.nama_karyawan 
+            FROM terapis_kerja tk
+            INNER JOIN karyawan k ON tk.id_terapis = k.id_karyawan
+            WHERE tk.id_transaksi = %s
+            ORDER BY tk.created_at DESC
+          """
+          await cursor.execute(q1, (id_trans, ))
+          items = await cursor.fetchone()
+
+          return items
+        except aiomysqlerror as e:
+          return JSONResponse({"Error aiomysql data terapis": str(e)}, status_code=500)
+        except HTTPException as e:
+          return JSONResponse({"Error HTTP": str(e.headers)}, status_code=e.status_code)
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data terapis Trans": str(e)}, status_code=500)
+  
 
 @app.get('/detailtrans/{id_trans}')
 async def get_detail(
