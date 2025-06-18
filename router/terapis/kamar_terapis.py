@@ -457,6 +457,7 @@ async def insert_datang(
             await cursor.execute(q1, (data['id_transaksi'], data['id_terapis'], jam_datang))
             await conn.commit()
 
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
           q2 = """
             SELECT mt.*, r.nama_ruangan FROM main_transaksi mt
             INNER JOIN ruangan r ON mt.id_ruangan = r.id_ruangan 

@@ -190,7 +190,7 @@ async def storeData(request: Request):
                         data.get('nama_akun', "-"),
                         data.get('no_rek', '-'),
                         data.get('nama_bank', '-'),
-                        data['gtotal_stlh_pajak'],
+                        data.get('grand_total', data['harga']),
                         data.get('keterangan', '-'),
                     ))
                     

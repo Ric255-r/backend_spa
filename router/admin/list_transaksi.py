@@ -155,10 +155,10 @@ async def getDataTrans(
         """
         await cursor.execute(q2)
         items2 = await cursor.fetchall()
-        data_cash = [item for item in items2 if item['metode_pembayaran'] == 'cash']
-        data_debit = [item for item in items2 if item['metode_pembayaran'] == 'debit']
-        data_kredit = [item for item in items2 if item['metode_pembayaran'] == 'kredit']
-        data_qris = [item for item in items2 if item['metode_pembayaran'] == 'qris']
+        data_cash = [item for item in items2 if item['metode_pembayaran'] == 'cash' and item['is_cancel'] == 0]
+        data_debit = [item for item in items2 if item['metode_pembayaran'] == 'debit' and item['is_cancel'] == 0]
+        data_kredit = [item for item in items2 if item['metode_pembayaran'] == 'kredit' and item['is_cancel'] == 0]
+        data_qris = [item for item in items2 if item['metode_pembayaran'] == 'qris' and item['is_cancel'] == 0]
         
         omset_cash = 0
         for data in data_cash:
@@ -397,6 +397,70 @@ async def get_detail(
 
   except Exception as e:
     return JSONResponse({"Error Get Data Detail Trans": str(e)}, status_code=500)
+  
+@app.put('/cancel_transaksi')
+async def cancel_transaksi(
+  request: Request
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try: 
+          await conn.begin()
+
+          data = await request.json()
+
+          qCheck = "SELECT 1 FROM users WHERE passwd = %s and hak_akses = %s"
+          await cursor.execute(qCheck, (data['passwd'], '5')) #Spv = 5
+          isExists = await cursor.fetchone()
+
+          if isExists:
+            q1 = """
+              UPDATE main_transaksi SET is_cancel = %s WHERE id_transaksi = %s
+            """
+            await cursor.execute(q1, ('1', data['id_trans']))
+
+            q2 = """
+              UPDATE pembayaran_transaksi SET is_cancel = %s WHERE id_transaksi = %s
+            """
+            await cursor.execute(q2, ('1', data['id_trans']))
+
+            q_details = [
+              "UPDATE detail_transaksi_fasilitas SET status = %s WHERE id_transaksi = %s",
+              "UPDATE detail_transaksi_fnb SET status = %s WHERE id_transaksi = %s",
+              "UPDATE detail_transaksi_member SET status = %s WHERE id_transaksi = %s",
+              "UPDATE detail_transaksi_paket SET status = %s WHERE id_transaksi = %s",
+              "UPDATE detail_transaksi_produk SET status = %s WHERE id_transaksi = %s",
+            ]
+            for query in q_details:
+              await cursor.execute(query, ('cancelled', data['id_trans']))
+              
+            await conn.commit()
+
+            return JSONResponse(content={"Success": "Berhasil Cancel Transaksi"}, status_code=200)
+          else:
+            return JSONResponse(content={"Gagal": "Tidak Ada Akses"}, status_code=401)
+
+        except aiomysqlerror as e:  # Fixed typo from aiomysqlerror
+            await conn.rollback()
+            return JSONResponse(
+                content={"success": False, "error": f"Database error: {str(e)}"},
+                status_code=500
+            )
+        except HTTPException as e:
+            await conn.rollback()
+            return JSONResponse(
+                content={"success": False, "error": str(e.detail)},
+                status_code=e.status_code
+          )
+
+  except Exception as e:
+    return JSONResponse(
+      content={"success": False, "error": f"Unexpected error: {str(e)}"},
+      status_code=500
+    )
 
 
 
