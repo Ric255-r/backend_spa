@@ -156,7 +156,7 @@ async def storeData(
             await cursor.execute(q_kurangstok, (item['jlh'], item['id_fnb'],))
 
           #Query Masukin ke Transaksi
-          if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
+          if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit" or data['metode_pembayaran'] == "kredit":
             q3 = """
               UPDATE main_transaksi
               SET
@@ -191,6 +191,23 @@ async def storeData(
               data['jumlah_bayar'] - data['gtotal_stlh_pajak'], 'paid',
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
+
+          qPayment = """
+            INSERT INTO pembayaran_transaksi(
+              id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+            )
+            VALUES(%s, %s, %s, %s, %s, %s, %s)
+          """
+          await cursor.execute(qPayment, (
+            data['id_transaksi'], 
+            data.get('metode_pembayaran', "-"), 
+            data.get('nama_akun', "-"),
+            data.get('no_rek', '-'),
+            data.get('nama_bank', '-'),
+            data['gtotal_stlh_pajak'],
+            data.get('keterangan', '-'),
+          ))
+            
 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()

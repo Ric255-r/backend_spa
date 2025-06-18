@@ -143,7 +143,7 @@ async def storeData(request: Request):
                     metode_pembayaran = data.get('metode_pembayaran', 'cash')
                     q3_values['metode_pembayaran'] = metode_pembayaran
                     
-                    if metode_pembayaran in ['qris', 'debit']:
+                    if metode_pembayaran in ['qris', 'debit', 'kredit']:
                         q3_values.update({
                             'nama_akun': data.get('nama_akun', ''),
                             'no_rek': data.get('no_rek', ''),
@@ -167,6 +167,9 @@ async def storeData(request: Request):
                             disc = %(disc)s,
                             grand_total = %(grand_total)s,
                             metode_pembayaran = %(metode_pembayaran)s,
+                            nama_akun = %(nama_akun)s,
+                            no_rek = %(no_rek)s,
+                            nama_bank = %(nama_bank)s,
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
                             jenis_pembayaran = %(jenis_pembayaran)s,
@@ -174,6 +177,22 @@ async def storeData(request: Request):
                         WHERE id_transaksi = %(id_transaksi)s
                     """
                     await cursor.execute(q3, q3_values)
+
+                    qPayment = """
+                        INSERT INTO pembayaran_transaksi(
+                        id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+                        )
+                        VALUES(%s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(qPayment, (
+                        data['id_transaksi'], 
+                        data.get('metode_pembayaran', "-"), 
+                        data.get('nama_akun', "-"),
+                        data.get('no_rek', '-'),
+                        data.get('nama_bank', '-'),
+                        data.get('grand_total', data['harga']),
+                        data.get('keterangan', '-'),
+                    ))
                     
                     await conn.commit()
                     return {"status": "Success", "message": "Payment processed successfully"}
@@ -197,13 +216,13 @@ async def store_tahunan(request: Request):
                 data = await request.json()
 
                 # Validate required fields
-                required = ['id_member', 'id_transaksi', 'kode_promo', 'harga']
+                required = ['id_member', 'id_transaksi', 'kode_promo', 'harga', 'exp_tahunan']
                 for field in required:
                     if field not in data:
                         raise HTTPException(status_code=400, detail=f"Missing field: {field}")
 
                 try:
-                    # Insert promo tahunan logic
+                    # Insert into detail_transaksi_member (promo tahunan)
                     new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
                     q_insert = """
                         INSERT INTO detail_transaksi_member(
@@ -216,7 +235,33 @@ async def store_tahunan(request: Request):
                         data['kode_promo'], data['harga'], data['exp_tahunan']
                     ))
 
-                    # Update transaction info
+                    # Prepare values for updating main_transaksi
+                    q_values = {
+                        'id_member': data['id_member'],
+                        'no_hp': data.get('no_hp', ''),
+                        'nama_tamu': data.get('nama_tamu', ''),
+                        'total_harga': data['harga'],
+                        'disc': 0,
+                        'grand_total': data['harga'],
+                        'jenis_pembayaran': False,
+                        'status': 'paid',
+                        'id_transaksi': data['id_transaksi'],
+                        'metode_pembayaran': data.get('metode_pembayaran', 'cash'),
+                        'nama_akun': '',
+                        'no_rek': '',
+                        'nama_bank': '',
+                        'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
+                        'jumlah_kembalian': 0
+                    }
+
+                    metode = q_values['metode_pembayaran']
+                    if metode == 'cash':
+                        q_values['jumlah_kembalian'] = data.get('jumlah_bayar', 0) - data['harga']
+                    elif metode in ['qris', 'debit', 'kredit']:
+                        q_values['nama_akun'] = data.get('nama_akun', '')
+                        q_values['no_rek'] = data.get('no_rek', '')
+                        q_values['nama_bank'] = data.get('nama_bank', '')
+
                     q_update = """
                         UPDATE main_transaksi SET
                             jenis_transaksi = 'member',
@@ -224,30 +269,39 @@ async def store_tahunan(request: Request):
                             no_hp = %(no_hp)s,
                             nama_tamu = %(nama_tamu)s,
                             total_harga = %(total_harga)s,
-                            disc = 0,
+                            disc = %(disc)s,
                             grand_total = %(grand_total)s,
                             metode_pembayaran = %(metode_pembayaran)s,
+                            nama_akun = %(nama_akun)s,
+                            no_rek = %(no_rek)s,
+                            nama_bank = %(nama_bank)s,
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
-                            jenis_pembayaran = FALSE,
-                            status = 'paid'
+                            jenis_pembayaran = %(jenis_pembayaran)s,
+                            status = %(status)s
                         WHERE id_transaksi = %(id_transaksi)s
                     """
-                    q_values = {
-                        'id_member': data['id_member'],
-                        'no_hp': data['no_hp'],
-                        'nama_tamu': data['nama_tamu'],
-                        'total_harga': data['harga'],
-                        'grand_total': data['harga'],
-                        'metode_pembayaran': data.get('metode_pembayaran', 'cash'),
-                        'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
-                        'jumlah_kembalian': data.get('jumlah_bayar', 0) - data['harga'],
-                        'id_transaksi': data['id_transaksi']
-                    }
                     await cursor.execute(q_update, q_values)
+
+                    qPayment = """
+                        INSERT INTO pembayaran_transaksi(
+                        id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+                        )
+                        VALUES(%s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(qPayment, (
+                        data['id_transaksi'], 
+                        data.get('metode_pembayaran', "-"), 
+                        data.get('nama_akun', "-"),
+                        data.get('no_rek', '-'),
+                        data.get('nama_bank', '-'),
+                        data['gtotal_stlh_pajak'],
+                        data.get('keterangan', '-'),
+                    ))
 
                     await conn.commit()
                     return {"status": "Success", "message": "Tahunan promo applied"}
+
                 except Exception as e:
                     await conn.rollback()
                     raise HTTPException(status_code=500, detail=f"DB error: {str(e)}")
