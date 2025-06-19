@@ -101,7 +101,7 @@ async def storeData(request: Request):
     try:
         pool = await get_db()
         async with pool.acquire() as conn:
-            async with conn.cursor() as cursor:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await conn.begin()
                 data = await request.json()
                 
@@ -142,7 +142,6 @@ async def storeData(request: Request):
                     # Handle payment method
                     metode_pembayaran = data.get('metode_pembayaran', 'cash')
                     q3_values['metode_pembayaran'] = metode_pembayaran
-                    
                     if metode_pembayaran in ['qris', 'debit', 'kredit']:
                         q3_values.update({
                             'nama_akun': data.get('nama_akun', ''),
@@ -151,13 +150,20 @@ async def storeData(request: Request):
                             'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
                             'jumlah_kembalian': 0
                         })
-                    else:  # cash
+                    else:  # cash  
                         q3_values.update({
                             'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
                             'jumlah_kembalian': data.get('jumlah_bayar', 0) - data['harga']
                         })
                     
-                    q3 = """
+                    q1 = """
+                        SELECT * FROM pajak LIMIT 1
+                    """
+                    await cursor.execute(q1)
+                    item_q1 = await cursor.fetchone()
+                    pjk = item_q1['pajak_msg'] * data.get('grand_total') + data.get('grand_total')
+                    print(pjk)
+                    q3 = f"""
                         UPDATE main_transaksi SET
                             jenis_transaksi = %(jenis_transaksi)s,
                             id_member = %(id_member)s,
@@ -166,16 +172,22 @@ async def storeData(request: Request):
                             total_harga = %(total_harga)s,
                             disc = %(disc)s,
                             grand_total = %(grand_total)s,
+                            pajak = {item_q1['pajak_msg']},
+                            gtotal_stlh_pajak = {pjk},
                             metode_pembayaran = %(metode_pembayaran)s,
-                            nama_akun = %(nama_akun)s,
-                            no_rek = %(no_rek)s,
-                            nama_bank = %(nama_bank)s,
+                            {"""
+                                nama_akun = %(nama_akun)s,
+                                no_rek = %(no_rek)s,
+                                nama_bank = %(nama_bank)s,
+                            """ if metode_pembayaran != "cash" else ""}
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
                             jenis_pembayaran = %(jenis_pembayaran)s,
                             status = %(status)s
                         WHERE id_transaksi = %(id_transaksi)s
                     """
+                    print("isi q3", q3)
+                    print(q3_values)
                     await cursor.execute(q3, q3_values)
 
                     qPayment = """
