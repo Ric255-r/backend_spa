@@ -94,15 +94,24 @@ async def deleteRoom(
 
     async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        
         try:
           # 1. Start Transaction
           await conn.begin()
-
           # 2. Execute querynya
           data = await request.json()
-          
-          q1 = "DELETE FROM ruangan WHERE id_ruangan = %s"
-          await cursor.execute(q1, (id_ruangan)) 
+          q1 = "SELECT id_karyawan FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(q1, (id_ruangan))
+          items = await cursor.fetchone()
+
+          id_karyawan = items[0]
+
+          q2 = "DELETE FROM ruangan WHERE id_ruangan = %s"
+          await cursor.execute(q2, (id_ruangan))
+
+          q3 = "DELETE FROM users WHERE id_karyawan = %s"
+          await cursor.execute(q3, (id_karyawan))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 

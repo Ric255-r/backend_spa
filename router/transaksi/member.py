@@ -223,7 +223,7 @@ async def store_tahunan(request: Request):
     try:
         pool = await get_db()
         async with pool.acquire() as conn:
-            async with conn.cursor() as cursor:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await conn.begin()
                 data = await request.json()
 
@@ -244,37 +244,52 @@ async def store_tahunan(request: Request):
                     """
                     await cursor.execute(q_insert, (
                         new_id_dt, data['id_transaksi'], data['id_member'],
-                        data['kode_promo'], data['harga'], data['exp_tahunan']
+                        data['kode_promo'], data['harga'], '2026-10-22'
                     ))
 
                     # Prepare values for updating main_transaksi
+
                     q_values = {
+                        'jenis_transaksi': 'member',
                         'id_member': data['id_member'],
-                        'no_hp': data.get('no_hp', ''),
-                        'nama_tamu': data.get('nama_tamu', ''),
-                        'total_harga': data['harga'],
+                        'no_hp': data['no_hp'],
+                        'nama_tamu': data['nama_tamu'],
+                        'total_harga': data.get('total_harga', data['harga']),
                         'disc': 0,
-                        'grand_total': data['harga'],
-                        'jenis_pembayaran': False,
+                        'grand_total': data.get('grand_total', data['harga']),
+                        'jenis_pembayaran': False,  # Always "awal"
                         'status': 'paid',
-                        'id_transaksi': data['id_transaksi'],
-                        'metode_pembayaran': data.get('metode_pembayaran', 'cash'),
-                        'nama_akun': '',
-                        'no_rek': '',
-                        'nama_bank': '',
-                        'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
-                        'jumlah_kembalian': 0
+                        'id_transaksi': data['id_transaksi']
                     }
 
-                    metode = q_values['metode_pembayaran']
-                    if metode == 'cash':
-                        q_values['jumlah_kembalian'] = data.get('jumlah_bayar', 0) - data['harga']
-                    elif metode in ['qris', 'debit', 'kredit']:
-                        q_values['nama_akun'] = data.get('nama_akun', '')
-                        q_values['no_rek'] = data.get('no_rek', '')
-                        q_values['nama_bank'] = data.get('nama_bank', '')
+                    metode_pembayaran = data.get('metode_pembayaran', 'cash')
+                    q_values['metode_pembayaran'] = metode_pembayaran
+                    if metode_pembayaran in ['qris', 'debit', 'kredit']:
+                        q_values.update({
+                            'nama_akun': data.get('nama_akun', ''),
+                            'no_rek': data.get('no_rek', ''),
+                            'nama_bank': data.get('nama_bank', ''),
+                            'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
+                            'jumlah_kembalian': 0
+                        })
+                    else:  # cash  
+                        q_values.update({
+                            'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
+                            'jumlah_kembalian': data.get('jumlah_bayar', 0) - data['harga']
+                        })
+                
+                    q1 = """
+                        SELECT * FROM pajak LIMIT 1
+                    """
+                    await cursor.execute(q1)
+                    item_q1 = await cursor.fetchone()
+                    pjk = item_q1['pajak_msg'] * data.get('grand_total') + data.get('grand_total')
 
-                    q_update = """
+                    print('sinta')
+                    print('ini pajak', pjk)
+                    print('sinti')
+                    
+                    q_update = f"""
                         UPDATE main_transaksi SET
                             jenis_transaksi = 'member',
                             id_member = %(id_member)s,
@@ -283,10 +298,14 @@ async def store_tahunan(request: Request):
                             total_harga = %(total_harga)s,
                             disc = %(disc)s,
                             grand_total = %(grand_total)s,
+                            pajak = {item_q1['pajak_msg']},
+                            gtotal_stlh_pajak = {pjk},
                             metode_pembayaran = %(metode_pembayaran)s,
-                            nama_akun = %(nama_akun)s,
-                            no_rek = %(no_rek)s,
-                            nama_bank = %(nama_bank)s,
+                            {"""
+                                nama_akun = %(nama_akun)s,
+                                no_rek = %(no_rek)s,
+                                nama_bank = %(nama_bank)s,
+                            """ if metode_pembayaran != "cash" else ''}
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
                             jenis_pembayaran = %(jenis_pembayaran)s,
@@ -301,15 +320,18 @@ async def store_tahunan(request: Request):
                         )
                         VALUES(%s, %s, %s, %s, %s, %s, %s)
                     """
+                    print('lala')
                     await cursor.execute(qPayment, (
                         data['id_transaksi'], 
                         data.get('metode_pembayaran', "-"), 
                         data.get('nama_akun', "-"),
                         data.get('no_rek', '-'),
                         data.get('nama_bank', '-'),
-                        data['gtotal_stlh_pajak'],
+                        data.get('grand_total', data['harga']),
                         data.get('keterangan', '-'),
                     ))
+                    item = await cursor.fetchall()
+                    print(item)
 
                     await conn.commit()
                     return {"status": "Success", "message": "Tahunan promo applied"}
