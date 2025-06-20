@@ -461,6 +461,10 @@ async def cancel_transaksi(
           await cursor.execute(qCheck, (data['passwd'], '5')) #Spv = 5
           isExists = await cursor.fetchone()
 
+          q_main = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(q_main, (data['id_trans'], ))
+          item_main = await cursor.fetchone()
+
           if isExists:
             q1 = """
               UPDATE main_transaksi SET is_cancel = %s WHERE id_transaksi = %s
@@ -481,6 +485,16 @@ async def cancel_transaksi(
             ]
             for query in q_details:
               await cursor.execute(query, ('cancelled', data['id_trans']))
+
+            q3 = """
+              UPDATE ruangan SET status = %s WHERE id_ruangan = %s
+            """
+            await cursor.execute(q3, ('aktif', item_main['id_ruangan']))
+
+            q4 = """
+              UPDATE karyawan SET is_occupied = 0 WHERE id_karyawan = %s
+            """
+            await cursor.execute(q4, item_main['id_terapis'])
               
             await conn.commit()
 

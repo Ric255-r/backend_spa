@@ -189,6 +189,8 @@ async def getLatestTrans(
             WHERE 
               m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
             AND 
+              m.is_cancel = 0
+            AND
               m.status NOT IN ('done', 'done-unpaid-addon', 'done-unpaid', 'draft')
             AND 
               dtpa.is_returned != 1
@@ -230,6 +232,8 @@ async def getLatestTrans(
             LEFT JOIN ruangan r ON m.id_ruangan = r.id_ruangan
             LEFT JOIN menu_produk mp ON dtpa.id_produk = mp.id_produk
             WHERE m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
+            AND 
+              m.is_cancel = 0
             AND m.status NOT IN ('done', 'done-unpaid', 'done-unpaid-addon', 'draft')
             {'AND m.id_transaksi = %s' if id_trans is not None else ''}
             ORDER BY m.created_at DESC
