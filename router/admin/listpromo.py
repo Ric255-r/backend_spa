@@ -394,7 +394,7 @@ async def deletepromotahunan(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "DELETE FROM detail_promo_tahunan WHERE detail_kode_promo IN(SELECT kode_detail_promo FROM PROMO  WHERE kode_promo = %s)"
+          q1 = "DELETE FROM detail_promo_tahunan WHERE detail_kode_promo IN(SELECT detail_kode_promo FROM PROMO  WHERE kode_promo = %s)"
           await cursor.execute(q1, (data['kode_promo']))
 
           q2 = "DELETE FROM PROMO WHERE kode_promo = %s"
