@@ -244,10 +244,11 @@ async def store_tahunan(request: Request):
                     """
                     await cursor.execute(q_insert, (
                         new_id_dt, data['id_transaksi'], data['id_member'],
-                        data['kode_promo'], data['harga'], data['exp_tahunan']
+                        data['kode_promo'], data['harga'], '2026-10-22'
                     ))
 
                     # Prepare values for updating main_transaksi
+
                     q_values = {
                         'jenis_transaksi': 'member',
                         'id_member': data['id_member'],
@@ -300,7 +301,7 @@ async def store_tahunan(request: Request):
                                 nama_akun = %(nama_akun)s,
                                 no_rek = %(no_rek)s,
                                 nama_bank = %(nama_bank)s,
-                            """ if metode_pembayaran != "cash" else ""}
+                            """ if metode_pembayaran != "cash" else ''}
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
                             jenis_pembayaran = %(jenis_pembayaran)s,
@@ -315,15 +316,18 @@ async def store_tahunan(request: Request):
                         )
                         VALUES(%s, %s, %s, %s, %s, %s, %s)
                     """
+                    print('lala')
                     await cursor.execute(qPayment, (
                         data['id_transaksi'], 
                         data.get('metode_pembayaran', "-"), 
                         data.get('nama_akun', "-"),
                         data.get('no_rek', '-'),
                         data.get('nama_bank', '-'),
-                        data['gtotal_stlh_pajak'],
+                        data.get('grand_total', data['harga']),
                         data.get('keterangan', '-'),
                     ))
+                    item = await cursor.fetchall()
+                    print(item)
 
                     await conn.commit()
                     return {"status": "Success", "message": "Tahunan promo applied"}
