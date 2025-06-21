@@ -495,6 +495,11 @@ async def cancel_transaksi(
               UPDATE karyawan SET is_occupied = 0 WHERE id_karyawan = %s
             """
             await cursor.execute(q4, item_main['id_terapis'])
+
+            q5 = """
+              UPDATE data_loker SET status = 0 WHERE nomor_locker = %s
+            """
+            await cursor.execute(q5, item_main['no_loker'])
               
             await conn.commit()
 
