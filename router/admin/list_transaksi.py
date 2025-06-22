@@ -10,6 +10,7 @@ from fastapi_jwt import (
   JwtRefreshBearer
 )
 import pandas as pd
+import socket
 from aiomysql import Error as aiomysqlerror
 
 app = APIRouter(
@@ -128,6 +129,17 @@ async def check_struk(id_trans: str):
       
   except Exception as e:
       raise HTTPException(status_code=500, detail=str(e))
+  
+@app.post("/print")
+async def print_pos_data(request: Request):
+  raw_data = await request.body()
+  try:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as printer:
+      printer.connect(('192.168.1.77', 9100))
+      printer.sendall(raw_data)
+    return {"status": "Printed successfully"}
+  except Exception as e:
+    return {"error": str(e)}
   
 @app.get('/datatrans')
 async def getDataTrans(
