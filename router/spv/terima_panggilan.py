@@ -25,6 +25,7 @@ async def spv_ws(
 
   except WebSocketDisconnect :
     spv_connection.remove(websocket)
+    print("ws spv disonnect")
 
 async def getlastestidpanggilan():
   try:
