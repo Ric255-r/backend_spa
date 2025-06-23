@@ -35,16 +35,16 @@ async def getPaket():
         # await asyncio.sleep(0.3)
 
         q1 = """
-        SELECT 
-    p.kode_promo,
-    p.nama_promo,
-    d.limit_kunjungan,
-    d.harga_promo,
-    d.limit_promo
-    FROM promo p
-    JOIN detail_promo_kunjungan d
-    ON p.detail_kode_promo = d.detail_kode_promo
-    WHERE p.detail_kode_promo LIKE 'DK%'
+            SELECT 
+            p.kode_promo,
+            p.nama_promo,
+            d.limit_kunjungan,
+            d.harga_promo,
+            d.limit_promo
+            FROM promo p
+            JOIN detail_promo_kunjungan d
+            ON p.detail_kode_promo = d.detail_kode_promo
+            WHERE p.detail_kode_promo LIKE 'DK%'
         """
         await cursor.execute(q1)
 

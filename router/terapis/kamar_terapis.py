@@ -819,6 +819,7 @@ async def selesai(
           elif total_addon == 0 and status == 'unpaid':
             mode = 'done-unpaid'
           
+          print("Mode Pas Selesai Kamar", mode)
           q1 = f"""
             UPDATE main_transaksi SET sedang_dikerjakan = FALSE,
             status = '{mode}' WHERE id_transaksi = %s
