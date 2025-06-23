@@ -163,6 +163,14 @@ async def storeData(request: Request):
                     item_q1 = await cursor.fetchone()
                     pjk = item_q1['pajak_msg'] * data.get('grand_total') + data.get('grand_total')
                     print(pjk)
+
+                    account_fields = ""
+                    if metode_pembayaran != "cash":
+                        account_fields = """
+                            nama_akun = %(nama_akun)s,
+                            no_rek = %(no_rek)s,
+                            nama_bank = %(nama_bank)s,
+                        """
                     q3 = f"""
                         UPDATE main_transaksi SET
                             jenis_transaksi = %(jenis_transaksi)s,
@@ -175,11 +183,7 @@ async def storeData(request: Request):
                             pajak = {item_q1['pajak_msg']},
                             gtotal_stlh_pajak = {pjk},
                             metode_pembayaran = %(metode_pembayaran)s,
-                            {"""
-                                nama_akun = %(nama_akun)s,
-                                no_rek = %(no_rek)s,
-                                nama_bank = %(nama_bank)s,
-                            """ if metode_pembayaran != "cash" else ""}
+                            {account_fields}
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
                             jenis_pembayaran = %(jenis_pembayaran)s,
@@ -288,6 +292,14 @@ async def store_tahunan(request: Request):
                     print('sinta')
                     print('ini pajak', pjk)
                     print('sinti')
+
+                    account_fields = ""
+                    if metode_pembayaran != "cash":
+                        account_fields = """
+                            nama_akun = %(nama_akun)s,
+                            no_rek = %(no_rek)s,
+                            nama_bank = %(nama_bank)s,
+                        """
                     
                     q_update = f"""
                         UPDATE main_transaksi SET
@@ -301,11 +313,7 @@ async def store_tahunan(request: Request):
                             pajak = {item_q1['pajak_msg']},
                             gtotal_stlh_pajak = {pjk},
                             metode_pembayaran = %(metode_pembayaran)s,
-                            {"""
-                                nama_akun = %(nama_akun)s,
-                                no_rek = %(no_rek)s,
-                                nama_bank = %(nama_bank)s,
-                            """ if metode_pembayaran != "cash" else ''}
+                            {account_fields}
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
                             jenis_pembayaran = %(jenis_pembayaran)s,
@@ -327,7 +335,7 @@ async def store_tahunan(request: Request):
                         data.get('nama_akun', "-"),
                         data.get('no_rek', '-'),
                         data.get('nama_bank', '-'),
-                        data.get('grand_total', data['harga']),
+                        {pjk},
                         data.get('keterangan', '-'),
                     ))
                     item = await cursor.fetchall()
