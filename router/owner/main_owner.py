@@ -105,25 +105,24 @@ async def getLaporan() :
         items2 = await cursor.fetchall()
 
         # Penjualan Paket. ambil dari grand_total yg main_transaksi. 
-        # Modify the query to use grand_total directly
         q3 = f"""
           {queryWith}
           SELECT 
               m.bulan, 
-              IFNULL(SUM(t.grand_total), 0) AS omset_jual_paket,
-              t.id_transaksi
+              IFNULL(SUM(dtp.harga_total), 0) AS omset_jual_paket,
+              t.id_transaksi, dtp.is_addon, t.jenis_pembayaran
           FROM 
               months m
           LEFT JOIN 
               main_transaksi t ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan
-              AND t.status IN ('paid', 'done')
+              AND t.status IN ('paid', 'done')  -- Only count completed transactions
               AND t.is_cancel = 0
           LEFT JOIN 
               detail_transaksi_paket dtp ON t.id_transaksi = dtp.id_transaksi
-              AND dtp.status = 'paid'
-              AND dtp.is_returned = 0
+              AND dtp.status = 'paid'  -- Only count paid package items
+              AND dtp.is_returned = 0  -- Exclude returned items
           GROUP BY 
-              m.bulan, t.id_transaksi
+              m.bulan, t.id_transaksi, dtp.is_addon, t.jenis_pembayaran
           ORDER BY 
               m.bulan DESC
         """
@@ -132,14 +131,14 @@ async def getLaporan() :
 
         penjualan_paket = []
         for data in items3:
-          # id_transaksi = data['id_transaksi']
-          # omset_jual_paket = int(data['omset_jual_paket']) or 0
+          id_transaksi = data['id_transaksi']
+          omset_jual_paket = int(data['omset_jual_paket']) or 0
 
-          # # ambil key id_transaksi di maintrans yg sama dgn data['id_transaksi']
-          # get_same_id = main_trans_dict.get(id_transaksi, {}) #klo g ad return obj kosong
-          # disc = float(get_same_id.get('disc', 0)) #klo g ad maka 0
+          # ambil key id_transaksi di maintrans yg sama dgn data['id_transaksi']
+          get_same_id = main_trans_dict.get(id_transaksi, {}) #klo g ad return obj kosong
+          disc = float(get_same_id.get('disc', 0)) #klo g ad maka 0
           
-          # # Rumus Persen
+          # Rumus Persen
           # if data['jenis_pembayaran'] == 1:
           #   # Case 1: Bayar diakhir, pasti dpt disc
           #   nominal_disc = omset_jual_paket * disc
@@ -153,10 +152,7 @@ async def getLaporan() :
           #   harga_stlh_disc = omset_jual_paket
 
           # Update key items3
-          # data['omset_jual_paket'] = harga_stlh_disc
-          # penjualan_paket.append(data)
-
-          data['omset_jual_paket'] = int(data['omset_jual_paket']) or 0
+          data['omset_jual_paket'] = omset_jual_paket
           penjualan_paket.append(data)
 
         # GroupBy valuenya berdasarkan key bulan
@@ -175,19 +171,20 @@ async def getLaporan() :
 
         q4 = f"""
           {queryWith}
-          SELECT 
-              m.bulan, 
-              IFNULL(SUM(t.grand_total), 0) AS omset_jual_produk,
-              t.id_transaksi
+          SELECT m.bulan, IFNULL(SUM(dtp.harga_total), 0) AS omset_jual_produk, t.id_transaksi,
+          dtp.is_addon, t.jenis_pembayaran
           FROM months m
+          -- pakai left join lalu and ke main_transaksi
           LEFT JOIN main_transaksi t 
             ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan 
             AND t.status IN ('paid', 'done') 
             AND t.is_cancel = 0
+          -- pakai left join lalu and ke detail_trans
           LEFT JOIN detail_transaksi_produk dtp 
             ON t.id_transaksi = dtp.id_transaksi 
             AND dtp.status = 'paid'
-          GROUP BY m.bulan, t.id_transaksi
+          -- baru digroup by
+          GROUP BY m.bulan, t.id_transaksi, dtp.is_addon, t.jenis_pembayaran
           ORDER BY m.bulan DESC
         """
         await cursor.execute(q4)
@@ -196,14 +193,14 @@ async def getLaporan() :
         # Buat list dlu supaya bs update data baru
         list_produk = []
         for data in items4:
-          # id_transaksi = data['id_transaksi']
-          # omset_jual_produk = int(data['omset_jual_produk']) or 0
+          id_transaksi = data['id_transaksi']
+          omset_jual_produk = int(data['omset_jual_produk']) or 0
 
-          # # ambil key maintrans yg sama dgn id_transaksi omset_jual_produk
-          # get_same_id = main_trans_dict.get(id_transaksi, {})
-          # disc = get_same_id.get('disc', 0)
+          # ambil key maintrans yg sama dgn id_transaksi omset_jual_produk
+          get_same_id = main_trans_dict.get(id_transaksi, {})
+          disc = get_same_id.get('disc', 0)
 
-          # # Rumus Persen
+          # Rumus Persen
           # if data['jenis_pembayaran'] == 1:
           #   # Case 1, Bayar Akhir, pasti dpt disc
           #   nominal_disc = omset_jual_produk * disc
@@ -216,11 +213,8 @@ async def getLaporan() :
           #   # Case 3: No discount applies (upfront payment for addon items)
           #   harga_stlh_disc = omset_jual_produk
 
-          # # Update key items3
-          # data['omset_jual_produk'] = harga_stlh_disc
-          # list_produk.append(data)
-
-          data['omset_jual_produk'] = int(data['omset_jual_produk']) or 0
+          # Update key items3
+          data['omset_jual_produk'] = omset_jual_produk
           list_produk.append(data)
         
         # Groupby Valuenya berdasarkan bulan
