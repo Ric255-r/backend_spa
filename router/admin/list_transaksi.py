@@ -155,7 +155,7 @@ async def getDataTrans(
           SELECT mt.*, COALESCE(r.nama_ruangan, '-') AS nama_ruangan FROM main_transaksi mt 
           LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan WHERE mt.status != 'draft'
           {'AND DATE(mt.created_at) = CURDATE()' if hak_akses == 'resepsionis' else ''}
-          ORDER BY mt.id_transaksi ASC
+          ORDER BY mt.created_at DESC
         """
         await cursor.execute(q1)
         items = await cursor.fetchall()
