@@ -35,16 +35,16 @@ async def getPaket():
         # await asyncio.sleep(0.3)
 
         q1 = """
-        SELECT 
-    p.kode_promo,
-    p.nama_promo,
-    d.limit_kunjungan,
-    d.harga_promo,
-    d.limit_promo
-    FROM promo p
-    JOIN detail_promo_kunjungan d
-    ON p.detail_kode_promo = d.detail_kode_promo
-    WHERE p.detail_kode_promo LIKE 'DK%'
+            SELECT 
+            p.kode_promo,
+            p.nama_promo,
+            d.limit_kunjungan,
+            d.harga_promo,
+            d.limit_promo
+            FROM promo p
+            JOIN detail_promo_kunjungan d
+            ON p.detail_kode_promo = d.detail_kode_promo
+            WHERE p.detail_kode_promo LIKE 'DK%'
         """
         await cursor.execute(q1)
 
@@ -163,6 +163,14 @@ async def storeData(request: Request):
                     item_q1 = await cursor.fetchone()
                     pjk = item_q1['pajak_msg'] * data.get('grand_total') + data.get('grand_total')
                     print(pjk)
+
+                    account_fields = ""
+                    if metode_pembayaran != "cash":
+                        account_fields = """
+                            nama_akun = %(nama_akun)s,
+                            no_rek = %(no_rek)s,
+                            nama_bank = %(nama_bank)s,
+                        """
                     q3 = f"""
                         UPDATE main_transaksi SET
                             jenis_transaksi = %(jenis_transaksi)s,
@@ -175,11 +183,7 @@ async def storeData(request: Request):
                             pajak = {item_q1['pajak_msg']},
                             gtotal_stlh_pajak = {pjk},
                             metode_pembayaran = %(metode_pembayaran)s,
-                            {"""
-                                nama_akun = %(nama_akun)s,
-                                no_rek = %(no_rek)s,
-                                nama_bank = %(nama_bank)s,
-                            """ if metode_pembayaran != "cash" else ""}
+                            {account_fields}
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
                             jenis_pembayaran = %(jenis_pembayaran)s,
@@ -288,6 +292,14 @@ async def store_tahunan(request: Request):
                     print('sinta')
                     print('ini pajak', pjk)
                     print('sinti')
+
+                    account_fields = ""
+                    if metode_pembayaran != "cash":
+                        account_fields = """
+                            nama_akun = %(nama_akun)s,
+                            no_rek = %(no_rek)s,
+                            nama_bank = %(nama_bank)s,
+                        """
                     
                     q_update = f"""
                         UPDATE main_transaksi SET
@@ -301,11 +313,7 @@ async def store_tahunan(request: Request):
                             pajak = {item_q1['pajak_msg']},
                             gtotal_stlh_pajak = {pjk},
                             metode_pembayaran = %(metode_pembayaran)s,
-                            {"""
-                                nama_akun = %(nama_akun)s,
-                                no_rek = %(no_rek)s,
-                                nama_bank = %(nama_bank)s,
-                            """ if metode_pembayaran != "cash" else ''}
+                            {account_fields}
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
                             jenis_pembayaran = %(jenis_pembayaran)s,
