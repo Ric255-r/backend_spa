@@ -25,7 +25,7 @@ async def getLaporan() :
       async with conn.cursor(aiomysql.DictCursor) as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         # Pilih Awal dlu
-        qMain = "SELECT id_transaksi, disc, grand_total, total_harga, jenis_pembayaran FROM main_transaksi WHERE status IN ('paid', 'done') AND is_cancel = 0"
+        qMain = "SELECT id_transaksi, disc, gtotal_stlh_pajak, total_harga, jenis_pembayaran FROM main_transaksi WHERE status IN ('paid', 'done') AND is_cancel = 0"
         await cursor.execute(qMain)  
         itemMain = await cursor.fetchall()
 
@@ -37,7 +37,7 @@ async def getLaporan() :
             "TF0001": {
               "id_transaksi": "TF0001",
               "disc": 0.2,
-              "grand_total": 648000,
+              "gtotal_stlh_pajak": 648000,
               "total_harga": 810000
             },
             "TF0002": { dan seterusnya},
@@ -55,7 +55,7 @@ async def getLaporan() :
         # q1 = """
 
         #   SELECT DATE_FORMAT(created_at, "%Y-%m") AS bulan,
-        #   SUM(grand_total) AS omset_jual
+        #   SUM(gtotal_stlh_pajak) AS omset_jual
         #   FROM main_transaksi
         #   WHERE created_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') 
         #   AND created_at < DATE_FORMAT(DATE_ADD(CURRENT_DATE, INTERVAL 12 MONTH), '%Y-%m-01')
@@ -71,7 +71,7 @@ async def getLaporan() :
             FROM months 
             WHERE num < 12
           )
-          SELECT m.bulan, IFNULL(SUM(t.grand_total), 0) AS omset_jual
+          SELECT m.bulan, IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_jual
           FROM months m 
           LEFT JOIN main_transaksi t 
           ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('done', 'paid') AND t.is_cancel = 0
@@ -92,7 +92,7 @@ async def getLaporan() :
         # Utk Dapetin Monthly Sales
         q2 = f"""
           {queryWith}
-          SELECT m.bulan, IFNULL(SUM(t.grand_total), 0) AS omset_jual
+          SELECT m.bulan, IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_jual
           FROM months m
           LEFT JOIN main_transaksi t 
             ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan 
@@ -104,7 +104,7 @@ async def getLaporan() :
         await cursor.execute(q2)
         items2 = await cursor.fetchall()
 
-        # Penjualan Paket. ambil dari grand_total yg main_transaksi. 
+        # Penjualan Paket. ambil dari gtotal_stlh_pajak yg main_transaksi. 
         q3 = f"""
           {queryWith}
           SELECT 
