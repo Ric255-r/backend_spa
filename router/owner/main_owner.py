@@ -25,7 +25,7 @@ async def getLaporan() :
       async with conn.cursor(aiomysql.DictCursor) as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         # Pilih Awal dlu
-        qMain = "SELECT id_transaksi, disc, grand_total, total_harga, jenis_pembayaran FROM main_transaksi WHERE status IN ('paid', 'done')"
+        qMain = "SELECT id_transaksi, disc, grand_total, total_harga, jenis_pembayaran FROM main_transaksi WHERE status IN ('paid', 'done') AND is_cancel = 0"
         await cursor.execute(qMain)  
         itemMain = await cursor.fetchall()
 
@@ -74,7 +74,7 @@ async def getLaporan() :
           SELECT m.bulan, IFNULL(SUM(t.grand_total), 0) AS omset_jual
           FROM months m 
           LEFT JOIN main_transaksi t 
-          ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('done', 'paid')
+          ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('done', 'paid') AND t.is_cancel = 0
           GROUP BY m.bulan
           ORDER BY m.bulan
         """
@@ -94,7 +94,8 @@ async def getLaporan() :
           {queryWith}
           SELECT m.bulan, IFNULL(SUM(t.grand_total), 0) AS omset_jual
           FROM months m
-          LEFT JOIN main_transaksi t ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan
+          LEFT JOIN main_transaksi t ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.is_cancel = 0
+
           GROUP BY m.bulan
           ORDER BY m.bulan DESC
         """
@@ -113,6 +114,7 @@ async def getLaporan() :
           LEFT JOIN 
               main_transaksi t ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan
               AND t.status IN ('paid', 'done')  -- Only count completed transactions
+              AND t.is_cancel = 0
           LEFT JOIN 
               detail_transaksi_paket dtp ON t.id_transaksi = dtp.id_transaksi
               AND dtp.status = 'paid'  -- Only count paid package items
@@ -172,7 +174,7 @@ async def getLaporan() :
           FROM months m
           -- pakai left join lalu and ke main_transaksi
           LEFT JOIN main_transaksi t 
-          ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('paid', 'done')
+          ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('paid', 'done') AND t.is_cancel = 0
           -- pakai left join lalu and ke detail_trans
           LEFT JOIN detail_transaksi_produk dtp 
           ON t.id_transaksi = dtp.id_transaksi AND dtp.status = 'paid'
