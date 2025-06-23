@@ -135,4 +135,8 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
+<<<<<<< HEAD
   uvicorn.run(app, host="192.168.31.183", port=5500)
+=======
+  uvicorn.run(app, host="0.0.0.0", port=5500)
+>>>>>>> 1c1c94fc5f8e1947984b6ed6c0869b8db65a918c

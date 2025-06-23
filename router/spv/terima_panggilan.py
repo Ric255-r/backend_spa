@@ -18,14 +18,33 @@ async def spv_ws(
 ):
   await websocket.accept()
   spv_connection.append(websocket)
+  print("klien terhubung")
+
   try:
     # Bikin Koneksi Ttp Nyala
-    print("Hai Ws Nyala")
-    await websocket.receive_text()
+    while True:
+      data = await websocket.receive_text()
 
+      try:
+        message_data = json.loads(data)
+
+        if message_data.get("type") == "ping":
+          print (f"Menerima hearteat dari klien SPV")
+
+          continue
+      except json.JSONDecodeError:
+          print(f"Menerima pesan bukan JSON : {data}")
+          pass
+      print(f"Menerima data asli: {data}")
+      for connection in spv_connection:
+        print('Klien SPv terputus')
+        await connection.send_text(data)
   except WebSocketDisconnect :
+    print('Klien SPV Terputus')
+  
+  finally:
     spv_connection.remove(websocket)
-    print("ws spv disonnect")
+    print('Koneksi dihapus')
 
 async def getlastestidpanggilan():
   try:
@@ -76,22 +95,28 @@ async def daftarpanggilankerja(
             await cursor.execute(q1, (lastidpanggilan,data['ruangan'], data['nama_terapis']))
 
             # 3. Klo Sukses, dia bkl save ke db
-            await conn.commit()
-
             q2 = "SELECT id_panggilan, ruangan, nama_terapis FROM panggilan_kerja_sementara"
+
             await cursor.execute(q2)
+
             all_records = await cursor.fetchall()
+            
             message_data = [{
                   "id_panggilan": row[0],
                   "ruangan": row[1],
                   "nama_terapis": row[2],
                   "timestamp" : datetime.datetime.now().isoformat()
                 } for row in all_records]
-      
+            
+            print(message_data)
+           
             for ws_con in spv_connection:
               await ws_con.send_text(
                 json.dumps(message_data)
               )
+
+            await conn.commit()
+
 
             return "Succes"
           except aiomysqlerror as e:

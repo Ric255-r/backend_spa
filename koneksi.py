@@ -3,6 +3,8 @@
 # conn = None
 
 import aiomysql # Utk Avoid Race Condition
+import os
+var = os.getenv('passwd_platinum')
 # pip install aiomysql
 from contextlib import asynccontextmanager
 
@@ -40,8 +42,8 @@ async def lifespan(app: FastAPI):
       minsize=2, # Keep 2 connections always open
       maxsize=13, # Max 13 connections under load
       pool_recycle=3600, # Recycle connections every 1h
-      connect_timeout=10,  # Timeout for establishing new connections
-      echo=True, # Utk Debug Sql
+      connect_timeout=10, # Timeout for establishing new connections
+      echo=False, # Set to True for debugging, False for production
     )
     
     """

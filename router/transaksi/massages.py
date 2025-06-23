@@ -94,6 +94,7 @@ async def storeData(
           jenis_pembayaran = data['jenis_pembayaran']
           status_trans = data['status']
           pajak = data['pajak']
+          print("Status Transaksi Massages pas Store", status_trans)
 
           q1 = """
             SELECT id_ruangan, id_terapis FROM main_transaksi
@@ -216,7 +217,7 @@ async def storeData(
           # false = awal
           if jenis_pembayaran == False:
             #Query Masukin ke Transaksi
-            if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
+            if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit" or data['metode_pembayaran'] == "kredit":
               q3 = """
                 UPDATE main_transaksi
                 SET
@@ -247,6 +248,24 @@ async def storeData(
                 data['jumlah_bayar'] - data['gtotal_stlh_pajak'], jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
               ))
+
+            # Ini Harus di store ke pembayaran_transaksi
+            # supaya bisa di sum di list_transaksi
+            qPayment = """
+              INSERT INTO pembayaran_transaksi(
+                id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+              )
+              VALUES(%s, %s, %s, %s, %s, %s, %s)
+            """
+            await cursor.execute(qPayment, (
+              data['id_transaksi'], 
+              data.get('metode_pembayaran', "-"), 
+              data.get('nama_akun', "-"),
+              data.get('no_rek', '-'),
+              data.get('nama_bank', '-'),
+              data['gtotal_stlh_pajak'],
+              data.get('keterangan', '-'),
+            ))
           
           # else ini unpaid = akhir.
           else:
@@ -264,23 +283,7 @@ async def storeData(
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 
-          # Ini Harus di store ke pembayaran_transaksi
-          # supaya bisa di sum di list_transaksi
-          qPayment = """
-            INSERT INTO pembayaran_transaksi(
-              id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
-            )
-            VALUES(%s, %s, %s, %s, %s, %s, %s)
-          """
-          await cursor.execute(qPayment, (
-            data['id_transaksi'], 
-            data.get('metode_pembayaran', "-"), 
-            data.get('nama_akun', "-"),
-            data.get('no_rek', '-'),
-            data.get('nama_bank', '-'),
-            data['gtotal_stlh_pajak'],
-            data.get('keterangan', '-'),
-          ))
+
             
           # Bikin ruangan dan terapis sedang dipake
           q4 = """
@@ -403,7 +406,7 @@ async def pelunasan(
           # # nominal_sblm_pjk = (gtotal_stlh_pajak + total_addon) * float(pajak)
           # gtotal_non_pajak = (main_grand_total + total_addon - nominal_pjk_addon) 
 
-          if metode_bayar == "debit" or metode_bayar == "qris":
+          if metode_bayar == "debit" or metode_bayar == "qris" or metode_bayar == "kredit":
             nama_akun = data['nama_akun']
             no_rek = data['no_rek']
             nama_bank = data['nama_bank']
@@ -411,10 +414,10 @@ async def pelunasan(
             q2 = """
               UPDATE main_transaksi SET grand_total = %s, gtotal_stlh_pajak = %s, total_addon = %s, 
               jumlah_bayar = %s, jumlah_kembalian = 0,
-              status = %s, nama_akun = %s, no_rek = %s, nama_bank = %s
+              status = %s, nama_akun = %s, no_rek = %s, nama_bank = %s, metode_pembayaran = %s
               WHERE id_transaksi = %s
             """
-            await cursor.execute(q2, (main_grand_total + total_addon, gtotal_stlh_pajak + total_addon_after_tax, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, id_trans))
+            await cursor.execute(q2, (main_grand_total + total_addon, gtotal_stlh_pajak + total_addon_after_tax, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, metode_bayar, id_trans))
           # else bayar cash
           else:
             q2 = """

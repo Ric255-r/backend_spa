@@ -101,7 +101,7 @@ async def storeData(
           # false = awal
           if jenis_pembayaran == False:
             #Query Masukin ke Transaksi
-            if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
+            if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit" or data['metode_pembayaran'] == "kredit":
               q3 = """
                 UPDATE main_transaksi
                 SET
@@ -132,7 +132,25 @@ async def storeData(
                 data['jumlah_bayar'] - gtotal_stlh_pajak, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
               ))
-          
+
+            # Ini Harus di store ke pembayaran_transaksi
+            # supaya bisa di sum di list_transaksi
+            qPayment = """
+              INSERT INTO pembayaran_transaksi(
+                id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+              )
+              VALUES(%s, %s, %s, %s, %s, %s, %s)
+            """
+            await cursor.execute(qPayment, (
+              data['id_transaksi'], 
+              data.get('metode_pembayaran', "-"), 
+              data.get('nama_akun', "-"),
+              data.get('no_rek', '-'),
+              data.get('nama_bank', '-'),
+              gtotal_stlh_pajak,
+              data.get('keterangan', '-'),
+            ))
+            
           # else ini unpaid = akhir.
           else:
             q3 = """
@@ -149,23 +167,7 @@ async def storeData(
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))
 
-          # Ini Harus di store ke pembayaran_transaksi
-          # supaya bisa di sum di list_transaksi
-          qPayment = """
-            INSERT INTO pembayaran_transaksi(
-              id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
-            )
-            VALUES(%s, %s, %s, %s, %s, %s, %s)
-          """
-          await cursor.execute(qPayment, (
-            data['id_transaksi'], 
-            data.get('metode_pembayaran', "-"), 
-            data.get('nama_akun', "-"),
-            data.get('no_rek', '-'),
-            data.get('nama_bank', '-'),
-            gtotal_stlh_pajak,
-            data.get('keterangan', '-'),
-          ))
+
           # Klo Sukses, dia bkl save ke db
           await conn.commit()
 

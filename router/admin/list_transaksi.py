@@ -10,6 +10,7 @@ from fastapi_jwt import (
   JwtRefreshBearer
 )
 import pandas as pd
+import socket
 from aiomysql import Error as aiomysqlerror
 
 app = APIRouter(
@@ -129,6 +130,17 @@ async def check_struk(id_trans: str):
   except Exception as e:
       raise HTTPException(status_code=500, detail=str(e))
   
+@app.post("/print")
+async def print_pos_data(request: Request):
+  raw_data = await request.body()
+  try:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as printer:
+      printer.connect(('192.168.1.77', 9100))
+      printer.sendall(raw_data)
+    return {"status": "Printed successfully"}
+  except Exception as e:
+    return {"error": str(e)}
+  
 @app.get('/datatrans')
 async def getDataTrans(
   hak_akses: Optional[str] = Query(None)
@@ -155,9 +167,10 @@ async def getDataTrans(
         """
         await cursor.execute(q2)
         items2 = await cursor.fetchall()
-        data_cash = [item for item in items2 if item['metode_pembayaran'] == 'cash']
-        data_debit = [item for item in items2 if item['metode_pembayaran'] == 'debit']
-        data_qris = [item for item in items2 if item['metode_pembayaran'] == 'qris']
+        data_cash = [item for item in items2 if item['metode_pembayaran'] == 'cash' and item['is_cancel'] == 0]
+        data_debit = [item for item in items2 if item['metode_pembayaran'] == 'debit' and item['is_cancel'] == 0]
+        data_kredit = [item for item in items2 if item['metode_pembayaran'] == 'kredit' and item['is_cancel'] == 0]
+        data_qris = [item for item in items2 if item['metode_pembayaran'] == 'qris' and item['is_cancel'] == 0]
         
         omset_cash = 0
         for data in data_cash:
@@ -166,10 +179,18 @@ async def getDataTrans(
         omset_debit = 0
         for data in data_debit:
           omset_debit += data['jumlah_bayar']
+  
+        omset_kredit = 0
+        for data in data_kredit:
+          omset_kredit += data['jumlah_bayar']
         
         omset_qris = 0
         for data in data_qris:
           omset_qris += data['jumlah_bayar']
+
+        q3 = "SELECT NOW() AS tgl"
+        await cursor.execute(q3)
+        dataTgl = await cursor.fetchone()
 
         # # Ambil data detail transaksi dari record main
         # detail_ids = []
@@ -251,14 +272,62 @@ async def getDataTrans(
         "main_data": items,
         "data_cash": data_cash,
         "data_debit": data_debit,
+        "data_kredit": data_kredit,
         "data_qris": data_qris,
         "total_cash": omset_cash,
         "total_debit": omset_debit,
+        "total_kredit": omset_kredit,
         "total_qris": omset_qris,
+        "tgl": dataTgl['tgl']
       }
 
   except Exception as e:
     return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
+  
+@app.get('/data_terapis/{id_trans}')
+async def get_data_terapis(
+  id_trans: str
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      # wajib tambahi parameter aiomysql.DictCursor untuk buat hasil dalam bentuk dictionary
+      # karena ak filter langsung make for loop yang item['is_addon']
+      # jadi ga usah pake pd.Dataframe lagi
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try: 
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+          q1 = """
+            SELECT 
+              tk.id,
+              tk.id_transaksi,
+              tk.id_terapis,
+              TIME_FORMAT(tk.jam_datang, '%%H:%%i:%%s') as jam_datang,
+              TIME_FORMAT(tk.jam_mulai, '%%H:%%i:%%s') as jam_mulai,
+              TIME_FORMAT(tk.jam_selesai, '%%H:%%i:%%s') as jam_selesai,
+              tk.alasan,
+              tk.created_at,
+              tk.is_tunda,
+              tk.is_cancel,
+              k.nama_karyawan 
+            FROM terapis_kerja tk
+            INNER JOIN karyawan k ON tk.id_terapis = k.id_karyawan
+            WHERE tk.id_transaksi = %s
+            ORDER BY tk.created_at DESC
+          """
+          await cursor.execute(q1, (id_trans, ))
+          items = await cursor.fetchone()
+
+          return items
+        except aiomysqlerror as e:
+          return JSONResponse({"Error aiomysql data terapis": str(e)}, status_code=500)
+        except HTTPException as e:
+          return JSONResponse({"Error HTTP": str(e.headers)}, status_code=e.status_code)
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data terapis Trans": str(e)}, status_code=500)
   
 
 @app.get('/detailtrans/{id_trans}')
@@ -385,6 +454,89 @@ async def get_detail(
 
   except Exception as e:
     return JSONResponse({"Error Get Data Detail Trans": str(e)}, status_code=500)
+  
+@app.put('/cancel_transaksi')
+async def cancel_transaksi(
+  request: Request
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try: 
+          await conn.begin()
+
+          data = await request.json()
+
+          qCheck = "SELECT 1 FROM users WHERE passwd = %s and hak_akses = %s"
+          await cursor.execute(qCheck, (data['passwd'], '5')) #Spv = 5
+          isExists = await cursor.fetchone()
+
+          q_main = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(q_main, (data['id_trans'], ))
+          item_main = await cursor.fetchone()
+
+          if isExists:
+            q1 = """
+              UPDATE main_transaksi SET is_cancel = %s WHERE id_transaksi = %s
+            """
+            await cursor.execute(q1, ('1', data['id_trans']))
+
+            q2 = """
+              UPDATE pembayaran_transaksi SET is_cancel = %s WHERE id_transaksi = %s
+            """
+            await cursor.execute(q2, ('1', data['id_trans']))
+
+            q_details = [
+              "UPDATE detail_transaksi_fasilitas SET status = %s WHERE id_transaksi = %s",
+              "UPDATE detail_transaksi_fnb SET status = %s WHERE id_transaksi = %s",
+              "UPDATE detail_transaksi_member SET status = %s WHERE id_transaksi = %s",
+              "UPDATE detail_transaksi_paket SET status = %s WHERE id_transaksi = %s",
+              "UPDATE detail_transaksi_produk SET status = %s WHERE id_transaksi = %s",
+            ]
+            for query in q_details:
+              await cursor.execute(query, ('cancelled', data['id_trans']))
+
+            q3 = """
+              UPDATE ruangan SET status = %s WHERE id_ruangan = %s
+            """
+            await cursor.execute(q3, ('aktif', item_main['id_ruangan']))
+
+            q4 = """
+              UPDATE karyawan SET is_occupied = 0 WHERE id_karyawan = %s
+            """
+            await cursor.execute(q4, (item_main['id_terapis'], ))
+
+            q5 = """
+              UPDATE data_loker SET status = 0 WHERE nomor_locker = %s
+            """
+            await cursor.execute(q5, (item_main['no_loker'], ))
+              
+            await conn.commit()
+
+            return JSONResponse(content={"Success": "Berhasil Cancel Transaksi"}, status_code=200)
+          else:
+            return JSONResponse(content={"Gagal": "Tidak Ada Akses"}, status_code=401)
+
+        except aiomysqlerror as e:  # Fixed typo from aiomysqlerror
+            await conn.rollback()
+            return JSONResponse(
+                content={"success": False, "error": f"Database error: {str(e)}"},
+                status_code=500
+            )
+        except HTTPException as e:
+            await conn.rollback()
+            return JSONResponse(
+                content={"success": False, "error": str(e.detail)},
+                status_code=e.status_code
+          )
+
+  except Exception as e:
+    return JSONResponse(
+      content={"success": False, "error": f"Unexpected error: {str(e)}"},
+      status_code=500
+    )
 
 
 

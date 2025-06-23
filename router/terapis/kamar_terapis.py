@@ -189,6 +189,8 @@ async def getLatestTrans(
             WHERE 
               m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
             AND 
+              m.is_cancel = 0
+            AND
               m.status NOT IN ('done', 'done-unpaid-addon', 'done-unpaid', 'draft')
             AND 
               dtpa.is_returned != 1
@@ -230,6 +232,8 @@ async def getLatestTrans(
             LEFT JOIN ruangan r ON m.id_ruangan = r.id_ruangan
             LEFT JOIN menu_produk mp ON dtpa.id_produk = mp.id_produk
             WHERE m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
+            AND 
+              m.is_cancel = 0
             AND m.status NOT IN ('done', 'done-unpaid', 'done-unpaid-addon', 'draft')
             {'AND m.id_transaksi = %s' if id_trans is not None else ''}
             ORDER BY m.created_at DESC
@@ -457,6 +461,7 @@ async def insert_datang(
             await cursor.execute(q1, (data['id_transaksi'], data['id_terapis'], jam_datang))
             await conn.commit()
 
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
           q2 = """
             SELECT mt.*, r.nama_ruangan FROM main_transaksi mt
             INNER JOIN ruangan r ON mt.id_ruangan = r.id_ruangan 
@@ -814,6 +819,7 @@ async def selesai(
           elif total_addon == 0 and status == 'unpaid':
             mode = 'done-unpaid'
           
+          print("Mode Pas Selesai Kamar", mode)
           q1 = f"""
             UPDATE main_transaksi SET sedang_dikerjakan = FALSE,
             status = '{mode}' WHERE id_transaksi = %s

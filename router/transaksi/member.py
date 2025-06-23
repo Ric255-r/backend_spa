@@ -35,16 +35,16 @@ async def getPaket():
         # await asyncio.sleep(0.3)
 
         q1 = """
-        SELECT 
-    p.kode_promo,
-    p.nama_promo,
-    d.limit_kunjungan,
-    d.harga_promo,
-    d.limit_promo
-    FROM promo p
-    JOIN detail_promo_kunjungan d
-    ON p.detail_kode_promo = d.detail_kode_promo
-    WHERE p.detail_kode_promo LIKE 'DK%'
+            SELECT 
+            p.kode_promo,
+            p.nama_promo,
+            d.limit_kunjungan,
+            d.harga_promo,
+            d.limit_promo
+            FROM promo p
+            JOIN detail_promo_kunjungan d
+            ON p.detail_kode_promo = d.detail_kode_promo
+            WHERE p.detail_kode_promo LIKE 'DK%'
         """
         await cursor.execute(q1)
 
@@ -101,7 +101,7 @@ async def storeData(request: Request):
     try:
         pool = await get_db()
         async with pool.acquire() as conn:
-            async with conn.cursor() as cursor:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await conn.begin()
                 data = await request.json()
                 
@@ -142,8 +142,7 @@ async def storeData(request: Request):
                     # Handle payment method
                     metode_pembayaran = data.get('metode_pembayaran', 'cash')
                     q3_values['metode_pembayaran'] = metode_pembayaran
-                    
-                    if metode_pembayaran in ['qris', 'debit']:
+                    if metode_pembayaran in ['qris', 'debit', 'kredit']:
                         q3_values.update({
                             'nama_akun': data.get('nama_akun', ''),
                             'no_rek': data.get('no_rek', ''),
@@ -151,13 +150,28 @@ async def storeData(request: Request):
                             'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
                             'jumlah_kembalian': 0
                         })
-                    else:  # cash
+                    else:  # cash  
                         q3_values.update({
                             'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
                             'jumlah_kembalian': data.get('jumlah_bayar', 0) - data['harga']
                         })
                     
-                    q3 = """
+                    q1 = """
+                        SELECT * FROM pajak LIMIT 1
+                    """
+                    await cursor.execute(q1)
+                    item_q1 = await cursor.fetchone()
+                    pjk = item_q1['pajak_msg'] * data.get('grand_total') + data.get('grand_total')
+                    print(pjk)
+
+                    account_fields = ""
+                    if metode_pembayaran != "cash":
+                        account_fields = """
+                            nama_akun = %(nama_akun)s,
+                            no_rek = %(no_rek)s,
+                            nama_bank = %(nama_bank)s,
+                        """
+                    q3 = f"""
                         UPDATE main_transaksi SET
                             jenis_transaksi = %(jenis_transaksi)s,
                             id_member = %(id_member)s,
@@ -166,14 +180,35 @@ async def storeData(request: Request):
                             total_harga = %(total_harga)s,
                             disc = %(disc)s,
                             grand_total = %(grand_total)s,
+                            pajak = {item_q1['pajak_msg']},
+                            gtotal_stlh_pajak = {pjk},
                             metode_pembayaran = %(metode_pembayaran)s,
+                            {account_fields}
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
                             jenis_pembayaran = %(jenis_pembayaran)s,
                             status = %(status)s
                         WHERE id_transaksi = %(id_transaksi)s
                     """
+                    print("isi q3", q3)
+                    print(q3_values)
                     await cursor.execute(q3, q3_values)
+
+                    qPayment = """
+                        INSERT INTO pembayaran_transaksi(
+                        id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+                        )
+                        VALUES(%s, %s, %s, %s, %s, %s, %s)
+                    """
+                    await cursor.execute(qPayment, (
+                        data['id_transaksi'], 
+                        data.get('metode_pembayaran', "-"), 
+                        data.get('nama_akun', "-"),
+                        data.get('no_rek', '-'),
+                        data.get('nama_bank', '-'),
+                        data.get('grand_total', data['harga']),
+                        data.get('keterangan', '-'),
+                    ))
                     
                     await conn.commit()
                     return {"status": "Success", "message": "Payment processed successfully"}
@@ -192,18 +227,18 @@ async def store_tahunan(request: Request):
     try:
         pool = await get_db()
         async with pool.acquire() as conn:
-            async with conn.cursor() as cursor:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await conn.begin()
                 data = await request.json()
 
                 # Validate required fields
-                required = ['id_member', 'id_transaksi', 'kode_promo', 'harga']
+                required = ['id_member', 'id_transaksi', 'kode_promo', 'harga', 'exp_tahunan']
                 for field in required:
                     if field not in data:
                         raise HTTPException(status_code=400, detail=f"Missing field: {field}")
 
                 try:
-                    # Insert promo tahunan logic
+                    # Insert into detail_transaksi_member (promo tahunan)
                     new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
                     q_insert = """
                         INSERT INTO detail_transaksi_member(
@@ -213,41 +248,102 @@ async def store_tahunan(request: Request):
                     """
                     await cursor.execute(q_insert, (
                         new_id_dt, data['id_transaksi'], data['id_member'],
-                        data['kode_promo'], data['harga'], data['exp_tahunan']
+                        data['kode_promo'], data['harga'], '2026-10-22'
                     ))
 
-                    # Update transaction info
-                    q_update = """
+                    # Prepare values for updating main_transaksi
+
+                    q_values = {
+                        'jenis_transaksi': 'member',
+                        'id_member': data['id_member'],
+                        'no_hp': data['no_hp'],
+                        'nama_tamu': data['nama_tamu'],
+                        'total_harga': data.get('total_harga', data['harga']),
+                        'disc': 0,
+                        'grand_total': data.get('grand_total', data['harga']),
+                        'jenis_pembayaran': False,  # Always "awal"
+                        'status': 'paid',
+                        'id_transaksi': data['id_transaksi']
+                    }
+
+                    metode_pembayaran = data.get('metode_pembayaran', 'cash')
+                    q_values['metode_pembayaran'] = metode_pembayaran
+                    if metode_pembayaran in ['qris', 'debit', 'kredit']:
+                        q_values.update({
+                            'nama_akun': data.get('nama_akun', ''),
+                            'no_rek': data.get('no_rek', ''),
+                            'nama_bank': data.get('nama_bank', ''),
+                            'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
+                            'jumlah_kembalian': 0
+                        })
+                    else:  # cash  
+                        q_values.update({
+                            'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
+                            'jumlah_kembalian': data.get('jumlah_bayar', 0) - data['harga']
+                        })
+                
+                    q1 = """
+                        SELECT * FROM pajak LIMIT 1
+                    """
+                    await cursor.execute(q1)
+                    item_q1 = await cursor.fetchone()
+                    pjk = item_q1['pajak_msg'] * data.get('grand_total') + data.get('grand_total')
+
+                    print('sinta')
+                    print('ini pajak', pjk)
+                    print('sinti')
+
+                    account_fields = ""
+                    if metode_pembayaran != "cash":
+                        account_fields = """
+                            nama_akun = %(nama_akun)s,
+                            no_rek = %(no_rek)s,
+                            nama_bank = %(nama_bank)s,
+                        """
+                    
+                    q_update = f"""
                         UPDATE main_transaksi SET
                             jenis_transaksi = 'member',
                             id_member = %(id_member)s,
                             no_hp = %(no_hp)s,
                             nama_tamu = %(nama_tamu)s,
                             total_harga = %(total_harga)s,
-                            disc = 0,
+                            disc = %(disc)s,
                             grand_total = %(grand_total)s,
+                            pajak = {item_q1['pajak_msg']},
+                            gtotal_stlh_pajak = {pjk},
                             metode_pembayaran = %(metode_pembayaran)s,
+                            {account_fields}
                             jumlah_bayar = %(jumlah_bayar)s,
                             jumlah_kembalian = %(jumlah_kembalian)s,
-                            jenis_pembayaran = FALSE,
-                            status = 'paid'
+                            jenis_pembayaran = %(jenis_pembayaran)s,
+                            status = %(status)s
                         WHERE id_transaksi = %(id_transaksi)s
                     """
-                    q_values = {
-                        'id_member': data['id_member'],
-                        'no_hp': data['no_hp'],
-                        'nama_tamu': data['nama_tamu'],
-                        'total_harga': data['harga'],
-                        'grand_total': data['harga'],
-                        'metode_pembayaran': data.get('metode_pembayaran', 'cash'),
-                        'jumlah_bayar': data.get('jumlah_bayar', data['harga']),
-                        'jumlah_kembalian': data.get('jumlah_bayar', 0) - data['harga'],
-                        'id_transaksi': data['id_transaksi']
-                    }
                     await cursor.execute(q_update, q_values)
+
+                    qPayment = """
+                        INSERT INTO pembayaran_transaksi(
+                        id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+                        )
+                        VALUES(%s, %s, %s, %s, %s, %s, %s)
+                    """
+                    print('lala')
+                    await cursor.execute(qPayment, (
+                        data['id_transaksi'], 
+                        data.get('metode_pembayaran', "-"), 
+                        data.get('nama_akun', "-"),
+                        data.get('no_rek', '-'),
+                        data.get('nama_bank', '-'),
+                        data.get('grand_total', data['harga']),
+                        data.get('keterangan', '-'),
+                    ))
+                    item = await cursor.fetchall()
+                    print(item)
 
                     await conn.commit()
                     return {"status": "Success", "message": "Tahunan promo applied"}
+
                 except Exception as e:
                     await conn.rollback()
                     raise HTTPException(status_code=500, detail=f"DB error: {str(e)}")

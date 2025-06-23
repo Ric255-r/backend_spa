@@ -156,7 +156,7 @@ async def storeData(
             await cursor.execute(q_kurangstok, (item['jlh'], item['id_fnb'],))
 
           #Query Masukin ke Transaksi
-          if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit":
+          if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit" or data['metode_pembayaran'] == "kredit":
             q3 = """
               UPDATE main_transaksi
               SET
