@@ -10,6 +10,7 @@ from fastapi_jwt import (
   JwtRefreshBearer
 )
 import pandas as pd
+import socket
 from aiomysql import Error as aiomysqlerror
 
 app = APIRouter(
@@ -129,6 +130,17 @@ async def check_struk(id_trans: str):
   except Exception as e:
       raise HTTPException(status_code=500, detail=str(e))
   
+@app.post("/print")
+async def print_pos_data(request: Request):
+  raw_data = await request.body()
+  try:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as printer:
+      printer.connect(('192.168.1.77', 9100))
+      printer.sendall(raw_data)
+    return {"status": "Printed successfully"}
+  except Exception as e:
+    return {"error": str(e)}
+  
 @app.get('/datatrans')
 async def getDataTrans(
   hak_akses: Optional[str] = Query(None)
@@ -143,7 +155,7 @@ async def getDataTrans(
           SELECT mt.*, COALESCE(r.nama_ruangan, '-') AS nama_ruangan FROM main_transaksi mt 
           LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan WHERE mt.status != 'draft'
           {'AND DATE(mt.created_at) = CURDATE()' if hak_akses == 'resepsionis' else ''}
-          ORDER BY mt.id_transaksi ASC
+          ORDER BY mt.created_at DESC
         """
         await cursor.execute(q1)
         items = await cursor.fetchall()
@@ -494,12 +506,12 @@ async def cancel_transaksi(
             q4 = """
               UPDATE karyawan SET is_occupied = 0 WHERE id_karyawan = %s
             """
-            await cursor.execute(q4, item_main['id_terapis'])
+            await cursor.execute(q4, (item_main['id_terapis'], ))
 
             q5 = """
               UPDATE data_loker SET status = 0 WHERE nomor_locker = %s
             """
-            await cursor.execute(q5, item_main['no_loker'])
+            await cursor.execute(q5, (item_main['no_loker'], ))
               
             await conn.commit()
 

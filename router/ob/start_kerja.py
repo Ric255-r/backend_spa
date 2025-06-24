@@ -1,4 +1,5 @@
 import json
+import traceback
 from typing import List, Optional
 import uuid
 from fastapi import APIRouter, Depends, File, Form, Query, Request, HTTPException, Security, UploadFile, WebSocket, WebSocketDisconnect
@@ -316,14 +317,16 @@ async def deletefnb(
           # 2. Execute querynya
           data = await request.json()
           q1 = "DELETE FROM kerja_ob_sementara WHERE id = %s"
-          await cursor.execute(q1, (data['id']))
+          print("isi q1", data['id'])
+          await cursor.execute(q1, (data['id'], ))
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
           return "succes"
-        except aiomysqlerror.MySQLError as e:
+        except aiomysqlerror as e:
           # Rollback Input Jika Error
-
+          error_details = traceback.format_exc()
+          print(str(error_details))
           # Ambil Error code
           error_code = e.args[0] if e.args else "Unknown"
           
@@ -336,6 +339,8 @@ async def deletefnb(
           return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
         
   except Exception as e:
+    error_details = traceback.format_exc()
+    print(str(error_details))
     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
   

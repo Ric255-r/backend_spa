@@ -25,7 +25,7 @@ async def getLaporan() :
       async with conn.cursor(aiomysql.DictCursor) as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
         # Pilih Awal dlu
-        qMain = "SELECT id_transaksi, disc, grand_total, total_harga, jenis_pembayaran FROM main_transaksi WHERE status IN ('paid', 'done')"
+        qMain = "SELECT id_transaksi, disc, gtotal_stlh_pajak, total_harga, jenis_pembayaran FROM main_transaksi WHERE status IN ('paid', 'done') AND is_cancel = 0"
         await cursor.execute(qMain)  
         itemMain = await cursor.fetchall()
 
@@ -37,7 +37,7 @@ async def getLaporan() :
             "TF0001": {
               "id_transaksi": "TF0001",
               "disc": 0.2,
-              "grand_total": 648000,
+              "gtotal_stlh_pajak": 648000,
               "total_harga": 810000
             },
             "TF0002": { dan seterusnya},
@@ -55,7 +55,7 @@ async def getLaporan() :
         # q1 = """
 
         #   SELECT DATE_FORMAT(created_at, "%Y-%m") AS bulan,
-        #   SUM(grand_total) AS omset_jual
+        #   SUM(gtotal_stlh_pajak) AS omset_jual
         #   FROM main_transaksi
         #   WHERE created_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') 
         #   AND created_at < DATE_FORMAT(DATE_ADD(CURRENT_DATE, INTERVAL 12 MONTH), '%Y-%m-01')
@@ -71,10 +71,10 @@ async def getLaporan() :
             FROM months 
             WHERE num < 12
           )
-          SELECT m.bulan, IFNULL(SUM(t.grand_total), 0) AS omset_jual
+          SELECT m.bulan, IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_jual
           FROM months m 
           LEFT JOIN main_transaksi t 
-          ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('done', 'paid')
+          ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('done', 'paid') AND t.is_cancel = 0
           GROUP BY m.bulan
           ORDER BY m.bulan
         """
@@ -92,16 +92,19 @@ async def getLaporan() :
         # Utk Dapetin Monthly Sales
         q2 = f"""
           {queryWith}
-          SELECT m.bulan, IFNULL(SUM(t.grand_total), 0) AS omset_jual
+          SELECT m.bulan, IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_jual
           FROM months m
-          LEFT JOIN main_transaksi t ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan
+          LEFT JOIN main_transaksi t 
+            ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan 
+            AND t.is_cancel = 0
+
           GROUP BY m.bulan
           ORDER BY m.bulan DESC
         """
         await cursor.execute(q2)
         items2 = await cursor.fetchall()
 
-        # Penjualan Paket. ambil dari grand_total yg main_transaksi. 
+        # Penjualan Paket. ambil dari gtotal_stlh_pajak yg main_transaksi. 
         q3 = f"""
           {queryWith}
           SELECT 
@@ -113,6 +116,7 @@ async def getLaporan() :
           LEFT JOIN 
               main_transaksi t ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan
               AND t.status IN ('paid', 'done')  -- Only count completed transactions
+              AND t.is_cancel = 0
           LEFT JOIN 
               detail_transaksi_paket dtp ON t.id_transaksi = dtp.id_transaksi
               AND dtp.status = 'paid'  -- Only count paid package items
@@ -135,20 +139,20 @@ async def getLaporan() :
           disc = float(get_same_id.get('disc', 0)) #klo g ad maka 0
           
           # Rumus Persen
-          if data['jenis_pembayaran'] == 1:
-            # Case 1: Bayar diakhir, pasti dpt disc
-            nominal_disc = omset_jual_paket * disc
-            harga_stlh_disc = omset_jual_paket - nominal_disc
-          elif data['jenis_pembayaran'] == 0 and data['is_addon'] == 0:
-            # Case 2: Payment upfront - only apply discount to non-addon items
-            nominal_disc = omset_jual_paket * disc
-            harga_stlh_disc = omset_jual_paket - nominal_disc
-          else:
-            # Ga dpt disc (bayar diawal. addon g dpt)
-            harga_stlh_disc = omset_jual_paket
+          # if data['jenis_pembayaran'] == 1:
+          #   # Case 1: Bayar diakhir, pasti dpt disc
+          #   nominal_disc = omset_jual_paket * disc
+          #   harga_stlh_disc = omset_jual_paket - nominal_disc
+          # elif data['jenis_pembayaran'] == 0 and data['is_addon'] == 0:
+          #   # Case 2: Payment upfront - only apply discount to non-addon items
+          #   nominal_disc = omset_jual_paket * disc
+          #   harga_stlh_disc = omset_jual_paket - nominal_disc
+          # else:
+          #   # Ga dpt disc (bayar diawal. addon g dpt)
+          #   harga_stlh_disc = omset_jual_paket
 
           # Update key items3
-          data['omset_jual_paket'] = harga_stlh_disc
+          data['omset_jual_paket'] = omset_jual_paket
           penjualan_paket.append(data)
 
         # GroupBy valuenya berdasarkan key bulan
@@ -172,10 +176,13 @@ async def getLaporan() :
           FROM months m
           -- pakai left join lalu and ke main_transaksi
           LEFT JOIN main_transaksi t 
-          ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('paid', 'done')
+            ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan 
+            AND t.status IN ('paid', 'done') 
+            AND t.is_cancel = 0
           -- pakai left join lalu and ke detail_trans
           LEFT JOIN detail_transaksi_produk dtp 
-          ON t.id_transaksi = dtp.id_transaksi AND dtp.status = 'paid'
+            ON t.id_transaksi = dtp.id_transaksi 
+            AND dtp.status = 'paid'
           -- baru digroup by
           GROUP BY m.bulan, t.id_transaksi, dtp.is_addon, t.jenis_pembayaran
           ORDER BY m.bulan DESC
@@ -194,20 +201,20 @@ async def getLaporan() :
           disc = get_same_id.get('disc', 0)
 
           # Rumus Persen
-          if data['jenis_pembayaran'] == 1:
-            # Case 1, Bayar Akhir, pasti dpt disc
-            nominal_disc = omset_jual_produk * disc
-            harga_stlh_disc = omset_jual_produk - nominal_disc
-          elif data['jenis_pembayaran'] == 0 and data['is_addon'] == 0:
-            # Case 2: Payment upfront - only apply discount to non-addon items
-            nominal_disc = omset_jual_produk * disc
-            harga_stlh_disc = omset_jual_produk - nominal_disc
-          else:
-            # Case 3: No discount applies (upfront payment for addon items)
-            harga_stlh_disc = omset_jual_produk
+          # if data['jenis_pembayaran'] == 1:
+          #   # Case 1, Bayar Akhir, pasti dpt disc
+          #   nominal_disc = omset_jual_produk * disc
+          #   harga_stlh_disc = omset_jual_produk - nominal_disc
+          # elif data['jenis_pembayaran'] == 0 and data['is_addon'] == 0:
+          #   # Case 2: Payment upfront - only apply discount to non-addon items
+          #   nominal_disc = omset_jual_produk * disc
+          #   harga_stlh_disc = omset_jual_produk - nominal_disc
+          # else:
+          #   # Case 3: No discount applies (upfront payment for addon items)
+          #   harga_stlh_disc = omset_jual_produk
 
           # Update key items3
-          data['omset_jual_produk'] = harga_stlh_disc
+          data['omset_jual_produk'] = omset_jual_produk
           list_produk.append(data)
         
         # Groupby Valuenya berdasarkan bulan

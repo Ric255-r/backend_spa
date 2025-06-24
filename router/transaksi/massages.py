@@ -94,6 +94,7 @@ async def storeData(
           jenis_pembayaran = data['jenis_pembayaran']
           status_trans = data['status']
           pajak = data['pajak']
+          print("Status Transaksi Massages pas Store", status_trans)
 
           q1 = """
             SELECT id_ruangan, id_terapis FROM main_transaksi
