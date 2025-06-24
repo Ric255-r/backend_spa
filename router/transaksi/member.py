@@ -244,7 +244,7 @@ async def store_tahunan(request: Request):
                     """
                     await cursor.execute(q_insert, (
                         new_id_dt, data['id_transaksi'], data['id_member'],
-                        data['kode_promo'], data['harga'], '2026-10-22'
+                        data['kode_promo'], data['harga'], data['exp_tahunan']
                     ))
 
                     # Prepare values for updating main_transaksi
