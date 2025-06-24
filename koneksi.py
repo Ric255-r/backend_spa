@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     pool = await aiomysql.create_pool(
       host=host,
       user=user,
-      password='',
+      password=str(var),
       db=db_name,
       port=int(port),
       minsize=2, # Keep 2 connections always open
