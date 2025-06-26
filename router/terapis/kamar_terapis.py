@@ -769,11 +769,11 @@ async def broadcast_update():
   pool = await get_db()
   async with pool.acquire() as conn:
     async with conn.cursor() as cursor:
-      q1 = "SELECT nama_ruangan, keterangan FROM kerja_ob_sementara ORDER BY id ASC"
+      q1 = "SELECT id, nama_ruangan, keterangan FROM kerja_ob_sementara ORDER BY id ASC"
       await cursor.execute(q1)
       result = await cursor.fetchall()
 
-  isidata = [{"nama_ruangan": row[0], "keterangan" : row[1]} for row in result]
+  isidata = [{"id":row[0],"nama_ruangan": row[1], "keterangan" : row[2]} for row in result]
 
   for websocket in ob_connections:
     await websocket.send_text(

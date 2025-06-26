@@ -162,3 +162,37 @@ async def detailproduk(request : Request):
 
   except Exception as e:
     return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
+  
+
+@app.get('/listkomisiowner')
+async def getlistkomisi(request : Request):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        data = await request.json()
+
+        q1 = "SELECT id_karyawan, SUM(nominal_komisi) AS total_komisi FROM komisi WHERE nominal_komisi != 0 AND MONTH(created_at) = %s and YEAR(created_at) = %s GROUP BY id_karyawan ORDER BY id_karyawan DESC"
+        await cursor.execute(q1, (data['month'], data['year']))
+        items = await cursor.fetchall()
+
+        result = []
+        for row in items:
+          id_karyawan = row[0]
+          q2 = "SELECT nama_karyawan FROM karyawan where id_karyawan = %s"
+          await cursor.execute(q2, id_karyawan)
+          nama = await cursor.fetchone()
+          result.append({
+            "id_karyawan": id_karyawan,
+            "nama_karyawan": nama[0],
+            "total_komisi":  row[1]
+          })
+        
+        print(result)
+        return result
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data Komisi": str(e)}, status_code=500)
