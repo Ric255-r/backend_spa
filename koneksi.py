@@ -3,8 +3,9 @@
 # conn = None
 
 import aiomysql # Utk Avoid Race Condition
-import os
-var = os.getenv('passwd_platinum')
+# import os
+# var = os.getenv('passwd_platinum')
+
 # pip install aiomysql
 from contextlib import asynccontextmanager
 
@@ -36,7 +37,7 @@ async def lifespan(app: FastAPI):
     pool = await aiomysql.create_pool(
       host=host,
       user=user,
-      password=str(var),
+      # password=str(var),
       db=db_name,
       port=int(port),
       minsize=2, # Keep 2 connections always open

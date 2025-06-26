@@ -143,7 +143,9 @@ async def print_pos_data(request: Request):
   
 @app.get('/datatrans')
 async def getDataTrans(
-  hak_akses: Optional[str] = Query(None)
+  hak_akses: Optional[str] = Query(None),
+  start_date: Optional[str] = Query(None),
+  end_date: Optional[str] = Query(None),
 ):
   try:
     pool = await get_db() # Get The pool
@@ -151,21 +153,51 @@ async def getDataTrans(
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor(aiomysql.DictCursor) as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+        kondisi_q1 = ["mt.status != 'draft'"]
+        params_q1 = []
+
+        kondisi_q2 = []
+        params_q2 = []
+
+        # Bikin kondisi_q1 dan q2 Dinamis antara Resepsionis dan Owner
+        if hak_akses == "resepsionis":
+          kondisi_q1.append("DATE(mt.created_at) = CURDATE()")
+          kondisi_q2.append("DATE(waktu_bayar) = CURDATE()")
+
+        elif hak_akses == "owner":
+          if start_date and end_date:
+            # Kondisi
+            kondisi_q1.append("DATE(mt.created_at) BETWEEN %s and %s")
+            kondisi_q2.append("DATE(waktu_bayar) BETWEEN %s and %s")
+            # Parameternya
+            params_q1.extend([start_date, end_date]) # extend() is for adding multiple elements from an iterable
+            params_q2.extend([start_date, end_date])
+          elif start_date:
+            kondisi_q1.append("DATE(mt.created_at) = %s")
+            kondisi_q2.append("DATE(waktu_bayar) = %s")
+            params_q1.append(start_date)
+            params_q2.append(start_date)
+          else:
+            kondisi_q1.append("DATE(mt.created_at) = CURDATE()")
+            kondisi_q2.append("DATE(waktu_bayar) = CURDATE()")
+
+        where_q1 = " AND ".join(kondisi_q1)
+        where_q2 = " AND ".join(kondisi_q2)
+
         q1 = f"""
           SELECT mt.*, COALESCE(r.nama_ruangan, '-') AS nama_ruangan FROM main_transaksi mt 
-          LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan WHERE mt.status != 'draft'
-          {'AND DATE(mt.created_at) = CURDATE()' if hak_akses == 'resepsionis' else ''}
-          ORDER BY mt.created_at DESC
+          LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan WHERE {where_q1}
+          ORDER BY mt.id_transaksi ASC
         """
-        await cursor.execute(q1)
+        print("Isi Q1 adalah ", q1)
+        await cursor.execute(q1, params_q1)
         items = await cursor.fetchall()
 
         q2 = f"""
-          SELECT * FROM pembayaran_transaksi
-          {'WHERE DATE(waktu_bayar) = CURDATE()' if hak_akses == 'resepsionis' else ''}
+          SELECT * FROM pembayaran_transaksi WHERE {where_q2}
           ORDER BY id_transaksi ASC
         """
-        await cursor.execute(q2)
+        await cursor.execute(q2, params_q2)
         items2 = await cursor.fetchall()
         data_cash = [item for item in items2 if item['metode_pembayaran'] == 'cash' and item['is_cancel'] == 0]
         data_debit = [item for item in items2 if item['metode_pembayaran'] == 'debit' and item['is_cancel'] == 0]
