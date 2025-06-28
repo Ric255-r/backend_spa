@@ -331,7 +331,7 @@ async def pelunasan(
     async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
         try:
-          await conn.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
+          await cursor.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
           # 1. Start Transaction
           await conn.begin()
 
