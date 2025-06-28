@@ -331,6 +331,7 @@ async def pelunasan(
     async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
         try:
+          await conn.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
           # 1. Start Transaction
           await conn.begin()
 
@@ -354,7 +355,12 @@ async def pelunasan(
           total_addon = rSelect[2]
           jlh_byr_main = rSelect[3]
           jlh_kembali_main = rSelect[4]
-          pajak_msg = rSelect[5] #Default Pajak Msg
+          # pajak_msg = rSelect[5] #Default Pajak Msg
+
+          # ambil query pajak
+          qPajak = "SELECT pajak_msg, pajak_fnb FROM pajak"
+          await cursor.execute(qPajak)
+          rPajak = await cursor.fetchone()
 
           # 2. Ambil detail addon untuk hitung pajak per jenis
           q_addons = """
@@ -382,7 +388,7 @@ async def pelunasan(
             addon_type = addon[1]
             harga_addon = addon[2]
             # Gunakan pajak berbeda berdasarkan jenis addon
-            pajak = 0.11 if addon_type == 'fnb' else pajak_msg
+            pajak = rPajak[1] if addon_type == 'fnb' else rPajak[0]
             total_addon_after_tax += harga_addon * (1 + pajak)
 
           # Bulatkan ke kelipatan 1000
@@ -417,7 +423,7 @@ async def pelunasan(
               status = %s, nama_akun = %s, no_rek = %s, nama_bank = %s, metode_pembayaran = %s
               WHERE id_transaksi = %s
             """
-            await cursor.execute(q2, (main_grand_total + total_addon, gtotal_stlh_pajak + total_addon_after_tax, 0, sum_jlh_byr,'done', nama_akun, no_rek, nama_bank, metode_bayar, id_trans))
+            await cursor.execute(q2, (main_grand_total + total_addon, gtotal_stlh_pajak + total_addon_after_tax, 0, sum_jlh_byr, 'done', nama_akun, no_rek, nama_bank, metode_bayar, id_trans))
           # else bayar cash
           else:
             q2 = """

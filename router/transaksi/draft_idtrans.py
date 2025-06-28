@@ -88,13 +88,15 @@ async def deleteDraftId(
           await conn.commit()
 
           return JSONResponse(content={"Success": "Delete Draft" }, status_code=200)
+        except aiomysqlerror as e:
+          await conn.rollback()
+          return JSONResponse(content={"Error aiomysql": str(e)}, status_code=500)
         except Exception as e:
           await conn.rollback()
           return JSONResponse(content={"Error Db": str(e)}, status_code=500)
 
 
   except Exception as e:
-
     return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
