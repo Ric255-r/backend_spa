@@ -97,37 +97,26 @@ async def getMenu():
     return JSONResponse({"Error Get Menu Fnb": str(e)}, status_code=500)
   
 @app.post('/store')
-async def storeData(
-  request: Request
-):
+async def storeData(request: Request):
   try:
     pool = await get_db()
 
     async with pool.acquire() as conn:
       async with conn.cursor() as cursor:
         try:
-          # 1. Start Transaction
           await conn.begin()
 
-          # 3. Execute query DT
           data = await request.json()
 
           seconds_local = time.time()
-          # Convert to milliseconds
           milliseconds_local = int(seconds_local * 1000)
-          # untuk id batch makanan. 
           id_batch = "BA" + str(milliseconds_local).zfill(16)
 
-          # Pecah kedalam bentuk list, krna detail_trans bentuk array
-          # Query Masukin Ke DetailTrans
+          jenis_pembayaran = data['jenis_pembayaran']  # False = awal
+          status_trans = data['status']
+
           details = data.get('detail_trans', [])
           for item in details:
-            # Samain dengan kode detailtransaksi massage
-            # seconds_local = time.time()
-            # # Convert to milliseconds
-            # milliseconds_local = int(seconds_local * 1000)
-            # # awalnya diambil dari variabel num
-            # new_id_dt = "DT" + str(milliseconds_local).zfill(16)
             new_id_dt = f"DT{uuid.uuid4().hex[:16]}"
 
             q2 = """
@@ -138,9 +127,11 @@ async def storeData(
                 %s, %s, %s, %s, %s, %s, %s, %s
               )
             """
-            await cursor.execute(q2, (new_id_dt, data['id_transaksi'], item['id_fnb'], item['jlh'], item['satuan'], item['harga_fnb'], item['harga_total'],'paid'))
+            await cursor.execute(q2, (
+              new_id_dt, data['id_transaksi'], item['id_fnb'], item['jlh'],
+              item['satuan'], item['harga_fnb'], item['harga_total'], status_trans
+            ))
 
-            # Masukin ke tabel kitchen juga
             q4 = """
               INSERT INTO kitchen(
                 id_transaksi, id_detail_transaksi, status_pesanan, is_addon, id_batch
@@ -149,70 +140,89 @@ async def storeData(
                 %s, %s, %s, %s, %s
               )
             """
-            await cursor.execute(q4, (data['id_transaksi'], new_id_dt, 'pending', 0, id_batch))
+            await cursor.execute(q4, (
+              data['id_transaksi'], new_id_dt, 'pending', 0, id_batch
+            ))
 
             q_kurangstok = "UPDATE menu_fnb SET stok_fnb = stok_fnb - %s where id_fnb = %s"
+            await cursor.execute(q_kurangstok, (item['jlh'], item['id_fnb']))
 
-            await cursor.execute(q_kurangstok, (item['jlh'], item['id_fnb'],))
+          # ----------------------
+          # Update main_transaksi
+          # ----------------------
+          if jenis_pembayaran ==  False:  # "awal" (paid)
+            if data['metode_pembayaran'] in ["qris", "debit", "kredit"]:
+              q3 = """
+                UPDATE main_transaksi
+                SET
+                  no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
+                  grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, 
+                  metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
+                  nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s,
+                  jenis_pembayaran = %s, status = %s
+                WHERE id_transaksi = %s
+              """
+              await cursor.execute(q3, (
+                -1, 'fnb', data['total_harga'], data['disc'],
+                data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'],
+                data['metode_pembayaran'], data['nama_akun'], data['no_rek'],
+                data['nama_bank'], data['jumlah_bayar'], 0,
+                jenis_pembayaran, status_trans, data['id_transaksi']
+              ))
+            else:  # cash
+              q3 = """
+                UPDATE main_transaksi
+                SET
+                  no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
+                  grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, 
+                  metode_pembayaran = %s, jumlah_bayar = %s, 
+                  jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
+                WHERE id_transaksi = %s
+              """
+              await cursor.execute(q3, (
+                -1, 'fnb', data['total_harga'], data['disc'],
+                data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'],
+                data['metode_pembayaran'], data['jumlah_bayar'],
+                data['jumlah_bayar'] - data['gtotal_stlh_pajak'],
+                jenis_pembayaran, status_trans, data['id_transaksi']
+              ))
 
-          #Query Masukin ke Transaksi
-          if data['metode_pembayaran'] == "qris" or data['metode_pembayaran'] == "debit" or data['metode_pembayaran'] == "kredit":
-            q3 = """
-              UPDATE main_transaksi
-              SET
-                no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
-                grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, 
-                metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
-                nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, status = %s
-              WHERE id_transaksi = %s
+            # INSERT into pembayaran_transaksi
+            qPayment = """
+              INSERT INTO pembayaran_transaksi(
+                id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
+              )
+              VALUES(%s, %s, %s, %s, %s, %s, %s)
             """
-            await cursor.execute(q3, (
-              -1, 'fnb', data['total_harga'], data['disc'], 
-              data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'], 
-              data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
-              data['nama_bank'], data['jumlah_bayar'], 0, 'paid',
-              data['id_transaksi']  # <- moved to last parameter because it's in WHERE
+            await cursor.execute(qPayment, (
+              data['id_transaksi'],
+              data.get('metode_pembayaran', "-"),
+              data.get('nama_akun', "-"),
+              data.get('no_rek', '-'),
+              data.get('nama_bank', '-'),
+              data['gtotal_stlh_pajak'],
+              data.get('keterangan', '-'),
             ))
-          else:
 
+          else:  # jenis_pembayaran == True (akhir = unpaid)
             q3 = """
               UPDATE main_transaksi
               SET
                 no_loker = %s, jenis_transaksi = %s, total_harga = %s, disc = %s, 
                 grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, 
                 metode_pembayaran = %s, jumlah_bayar = %s, 
-                jumlah_kembalian = %s, status = %s
+                jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
-              -1, 'fnb', data['total_harga'], data['disc'], 
-              data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'], 
-              data['metode_pembayaran'], data['jumlah_bayar'], 
-              data['jumlah_bayar'] - data['gtotal_stlh_pajak'], 'paid',
-              data['id_transaksi']  # <- moved to last parameter because it's in WHERE
+              -1, 'fnb', data['total_harga'], data['disc'],
+              data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'],
+              "-", 0, 0, jenis_pembayaran, status_trans, data['id_transaksi']
             ))
 
-          qPayment = """
-            INSERT INTO pembayaran_transaksi(
-              id_transaksi, metode_pembayaran, nama_akun, no_rek, nama_bank, jumlah_bayar, keterangan
-            )
-            VALUES(%s, %s, %s, %s, %s, %s, %s)
-          """
-          await cursor.execute(qPayment, (
-            data['id_transaksi'], 
-            data.get('metode_pembayaran', "-"), 
-            data.get('nama_akun', "-"),
-            data.get('no_rek', '-'),
-            data.get('nama_bank', '-'),
-            data['gtotal_stlh_pajak'],
-            data.get('keterangan', '-'),
-          ))
-            
-
-          # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 
-          # Ini utk aktifkan websocket kirim ke admin
+          # Notify kitchen via WebSocket
           for ws_con in kitchen_connection:
             await ws_con.send_text(
               json.dumps({
@@ -222,24 +232,20 @@ async def storeData(
               })
             )
 
-
           return JSONResponse(content={"status": "Success", "message": "Data Berhasil Diinput"}, status_code=200)
-        except aiomysqlerror as e:
-          # Rollback Input Jika Error
 
-          # Ambil Error code
-          error_code = e.args[0] if e.args else "Unknown"
-          
+        except aiomysqlerror as e:
           await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
-        
+          return JSONResponse(content={"status": "Error", "message": f"Database Error {e}"}, status_code=500)
+
         except Exception as e:
           await conn.rollback()
           print(f"Error {e}")
-          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
-        
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e}"}, status_code=500)
+
   except Exception as e:
-    return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+
   
 
 @app.get('/selected_food')
