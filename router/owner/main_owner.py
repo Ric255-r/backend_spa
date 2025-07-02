@@ -315,6 +315,13 @@ def excel_to_pdf(excel_path, pdf_path):
     if excel:
       excel.Quit()
   
+def formatStrDate(
+  params: str
+):
+  tgl = params.split("-")
+  formatted_tgl = tgl[2] + "-" + tgl[1] + "-" + tgl[0]
+  return formatted_tgl
+
 @app.get('/export_excel')
 async def exportExcel(
   start_date: Optional[str] = Query(None),
@@ -329,14 +336,15 @@ async def exportExcel(
           await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
 
           kondisi = ""
-          tgl = ""
+          tgl = "" # buat munculin di excel. ini formatnya dd-mm-yyyy
           params= []
           if start_date and end_date:
-            tgl = start_date + " s/d " + end_date
+            tgl = formatStrDate(start_date) + " s/d " + formatStrDate(end_date)
+            # kalo utk kondisi formatny hrs sesuai dgn sql yaitu yyyy-mm-dd
             kondisi = "WHERE DATE(mt.created_at) BETWEEN %s AND %s"
             params.extend([start_date, end_date])
           elif start_date:
-            tgl = start_date
+            tgl = formatStrDate(start_date)
             kondisi = "WHERE DATE(mt.created_at) = %s"
             params.append(start_date)            
           else:
@@ -346,13 +354,15 @@ async def exportExcel(
             await cursor.execute(q_tgl)
 
             item_tgl = await cursor.fetchone()
-            tgl = item_tgl['tgl']
+            fetched_tgl = str(item_tgl['tgl']).split(" ")
+            tgl = formatStrDate(fetched_tgl[0])
 
           q1 = f"""
-            SELECT mt.id_transaksi,  mt.no_loker, mt.created_at AS tgl_beli, mt.jenis_transaksi, mt.jenis_tamu, mt.id_member, 
-            k.nama_karyawan as resepsionis,
+            SELECT mt.id_transaksi, mt.created_at AS tgl_beli, mt.jenis_transaksi, r.nama_ruangan AS kamar, k_terapis.nama_karyawan AS terapis,
             mt.total_harga, mt.disc, mt.grand_total, mt.metode_pembayaran as metode_bayar
             FROM main_transaksi mt
+            LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan
+            -- JOIN tabel yang sama
             LEFT JOIN karyawan k ON mt.id_resepsionis = k.id_karyawan
             LEFT JOIN karyawan k_terapis ON mt.id_terapis = k_terapis.id_karyawan
             LEFT JOIN karyawan k_gro ON mt.id_gro = k_gro.id_karyawan {kondisi}
@@ -367,7 +377,7 @@ async def exportExcel(
 
           # Step 3, Tambahkan Header kaya Judul lalu di Merge
           corporate_name = "PLATINUM"
-          ws.merge_cells('A1:K1') # Merge A1 smpe M1
+          ws.merge_cells('A1:I1') # Merge A1 smpe I1
           corp_cell = ws['A1']
           corp_cell.value = corporate_name
 
@@ -378,8 +388,8 @@ async def exportExcel(
             cell.font = header_font
 
           # Step 5, Tambah Keterangan dibawah nama korporat yg diheader A1
-          corporate_ket = f"LAPORAN PENJUALAN PER TANGGAL {tgl}"
-          ws.merge_cells('A2:K2')
+          corporate_ket = f"LAPORAN PENJUALAN PERIODE {tgl}"
+          ws.merge_cells('A2:I2')
           ket_cell = ws['A2']
           ket_cell.value = corporate_ket
 
@@ -391,6 +401,14 @@ async def exportExcel(
 
           # Buat Row Kosong
           ws.append([])
+
+          # Check if data is empty
+          if not main_data:
+            print("Transaksi Kosong")
+            return JSONResponse(
+              {"message": f"No transaction data found for {tgl}"},
+              status_code=500
+            )
 
           # Step 7 : Tambah Header. konversi ke string dlu
           column_main = []
@@ -480,9 +498,9 @@ async def exportExcel(
                 pass
             
             if idx == 1:
-              # Khusus id_transaksi ttpin 10 karakter
+              # Khusus id_transaksi ttpin 15 karakter
               adjusted_width = 15
-            elif idx == 3:
+            elif idx == 2:
               # Tglbeli, 12 karakter aja
               adjusted_width = 12
             else:
@@ -491,10 +509,39 @@ async def exportExcel(
 
             ws.column_dimensions[column_letter].width = adjusted_width
 
-            # aktifkan wraptext untuk kolom yang ada newline
             for cell in col:
+              # aktifkan wraptext untuk kolom yang ada newline
               if cell.value and "\n" in str(cell.value):
                 cell.alignment = Alignment(wrap_text=True)
+              # Format yg Bersifat Int
+              if isinstance(cell.value, int):
+                cell.alignment = Alignment(horizontal="right")
+                cell.number_format = '#,##0'
+
+          # After adding all your data rows (after the for row in main_data loop)
+          # Add an empty row for separation
+          ws.append([])
+
+          # Add the summary row. adjust yang len(column_main) - 3. klo mw perkecil, besarin  valuenya
+          summary_label = "TOTAL"
+          ws.append([summary_label] + [""] * (len(column_main) - 3) + ["", sum(row['grand_total'] for row in main_data)])
+
+          # Style the summary row
+          summary_row = ws[ws.max_row]  # Get the last row
+          for cell in summary_row:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="D3D3D3", fill_type="solid")
+            cell.border = Border(
+              left=Side(style="thin"),
+              right=Side(style="thin"),
+              top=Side(style="thin"),
+              bottom=Side(style="thin"),
+            )
+
+          # Make the total value right-aligned and formatted with thousands separator
+          total_cell = ws.cell(row=ws.max_row, column=len(column_main))
+          total_cell.alignment = Alignment(horizontal="right")
+          total_cell.number_format = '#,##0'
 
           # Step 10 : Simpan Workbook Ke File
           file_path = "datapenjualan_platinum.xlsx"
@@ -505,6 +552,7 @@ async def exportExcel(
           wb.save(file_path)
           os.chmod(file_path, 0o444)  # Set back to read-only
 
+          # Panggil Fungsi excel_to_pdf yg manual aku buat
           pdf_output = "datapenjualan_platinum.pdf"
           excel_to_pdf(file_path, pdf_output)
 
