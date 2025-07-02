@@ -359,7 +359,7 @@ async def exportExcel(
 
           q1 = f"""
             SELECT mt.id_transaksi, mt.created_at AS tgl_beli, mt.jenis_transaksi, r.nama_ruangan AS kamar, k_terapis.nama_karyawan AS terapis,
-            mt.total_harga, mt.disc, mt.grand_total, mt.metode_pembayaran as metode_bayar
+            mt.total_harga, mt.disc, mt.grand_total, (mt.gtotal_stlh_pajak - mt.grand_total) AS pembulatan, mt.gtotal_stlh_pajak AS bayar
             FROM main_transaksi mt
             LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan
             -- JOIN tabel yang sama
@@ -524,7 +524,7 @@ async def exportExcel(
 
           # Add the summary row. adjust yang len(column_main) - 3. klo mw perkecil, besarin  valuenya
           summary_label = "TOTAL"
-          ws.append([summary_label] + [""] * (len(column_main) - 3) + ["", sum(row['grand_total'] for row in main_data)])
+          ws.append([summary_label] + [""] * (len(column_main) - 3) + ["", sum(row['bayar'] for row in main_data)])
 
           # Style the summary row
           summary_row = ws[ws.max_row]  # Get the last row
