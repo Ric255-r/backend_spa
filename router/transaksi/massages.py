@@ -391,8 +391,9 @@ async def pelunasan(
             pajak = rPajak[1] if addon_type == 'fnb' else rPajak[0]
             total_addon_after_tax += harga_addon * (1 + pajak)
 
-          # Bulatkan ke kelipatan 1000
-          total_addon_after_tax = round(total_addon_after_tax / 1000) * 1000
+          # Bulatkan ke kelipatan 1000. Ini Original. Ak Comment
+          # total_addon_after_tax = round(total_addon_after_tax / 1000) * 1000
+          total_addon_after_tax = int(total_addon_after_tax / 1000 + 0.5) * 1000
 
           # nominal_pjk_addon = total_addon * pajak
           # # ini sudah plus pajak, blm bulat

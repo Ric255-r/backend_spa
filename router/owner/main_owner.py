@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import stat
 from typing import Optional
@@ -7,12 +8,15 @@ from fastapi import APIRouter, File, Form, Query, Request, HTTPException, Securi
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font
+from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.cell import MergedCell
 from openpyxl.workbook.protection import WorkbookProtection
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
 import asyncio
+import win32com.client
+from pywintypes import com_error
 
 app = APIRouter(prefix=("/main_owner"))
 
@@ -257,10 +261,71 @@ async def getLaporan() :
   except HTTPException as e:
    return JSONResponse({"Error": str(e)}, status_code=e.status_code) 
   
+def excel_to_pdf(excel_path, pdf_path):
+  excel = win32com.client.Dispatch("Excel.Application")
+  excel.Visible = False #Buat Excel Hidden
+  excel.DisplayAlerts = False #Lewati Alert
+
+  try:
+    print(f"Converting '{excel_path}' to PDF...")
+    wb = excel.Workbooks.Open(os.path.abspath(excel_path))
+    # --- Add Page Setup to fit content ---
+    ws = wb.ActiveSheet
+    # --- Page Setup Configuration ---
+    # 1. Set print area to only used cells
+    used_range = ws.UsedRange
+    ws.PageSetup.PrintArea = used_range.Address
+    
+    # 2. Fit to one page wide and tall
+    ws.PageSetup.FitToPagesWide = 1
+    ws.PageSetup.FitToPagesTall = 1
+    
+    # 3. Prevent row/column splitting
+    ws.PageSetup.FitToPagesTall = False  # Allow multiple pages if needed
+    ws.PageSetup.Zoom = False  # Disable zoom to enforce FitToPages
+    
+    # 4. Set margins (optional, adjust as needed)
+    ws.PageSetup.LeftMargin = 20
+    ws.PageSetup.RightMargin = 20
+    ws.PageSetup.TopMargin = 20
+    ws.PageSetup.BottomMargin = 20
+    
+    # 5. Center on page
+    ws.PageSetup.CenterHorizontally = True
+    ws.PageSetup.CenterVertically = True
+    
+    # 6. Set paper size (A4)
+    ws.PageSetup.PaperSize = 9  # 9 = xlPaperA4
+    
+    # 7. Set orientation (Auto: Excel will decide based on content)
+    if used_range.Columns.Count > 10:  # If many columns, use landscape
+        ws.PageSetup.Orientation = 2  # 2 = xlLandscape
+    else:
+        ws.PageSetup.Orientation = 1  # 1 = xlPortrait
+
+    # --- Export to PDF ---
+    wb.ActiveSheet.ExportAsFixedFormat(0, os.path.abspath(pdf_path))
+    print("Conversion successful!")
+        
+  except com_error as e:
+    print(f"Conversion failed: {e}")
+  finally:
+    if 'wb' in locals() and wb:
+      wb.Close(SaveChanges=False)
+    if excel:
+      excel.Quit()
+  
+def formatStrDate(
+  params: str
+):
+  tgl = params.split("-")
+  formatted_tgl = tgl[2] + "-" + tgl[1] + "-" + tgl[0]
+  return formatted_tgl
+
 @app.get('/export_excel')
 async def exportExcel(
-  # tglAwal: str = Query(...),
-  # tglAkhir: str = Query(...)
+  start_date: Optional[str] = Query(None),
+  end_date: Optional[str] = Query(None)
 ):
   try :
     pool = await get_db()
@@ -270,14 +335,39 @@ async def exportExcel(
         try:
           await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
 
-          q1 = """
-            SELECT mt.id_transaksi,  mt.no_loker, mt.created_at AS tgl_beli, mt.jenis_transaksi, mt.jenis_tamu, mt.id_member, 
-            k.nama_karyawan as nama_resepsionis,
-            mt.total_harga, mt.disc, mt.grand_total, mt.metode_pembayaran
+          kondisi = ""
+          tgl = "" # buat munculin di excel. ini formatnya dd-mm-yyyy
+          params= []
+          if start_date and end_date:
+            tgl = formatStrDate(start_date) + " s/d " + formatStrDate(end_date)
+            # kalo utk kondisi formatny hrs sesuai dgn sql yaitu yyyy-mm-dd
+            kondisi = "WHERE DATE(mt.created_at) BETWEEN %s AND %s"
+            params.extend([start_date, end_date])
+          elif start_date:
+            tgl = formatStrDate(start_date)
+            kondisi = "WHERE DATE(mt.created_at) = %s"
+            params.append(start_date)            
+          else:
+            kondisi = "WHERE DATE(mt.created_at) = CURDATE()"
+            # Ambil Date Now Skrg
+            q_tgl = "SELECT NOW() AS tgl"
+            await cursor.execute(q_tgl)
+
+            item_tgl = await cursor.fetchone()
+            fetched_tgl = str(item_tgl['tgl']).split(" ")
+            tgl = formatStrDate(fetched_tgl[0])
+
+          q1 = f"""
+            SELECT mt.id_transaksi, mt.created_at AS tgl_beli, mt.jenis_transaksi, r.nama_ruangan AS kamar, k_terapis.nama_karyawan AS terapis,
+            mt.total_harga, mt.disc, mt.grand_total, (mt.gtotal_stlh_pajak - mt.grand_total) AS pembulatan, mt.gtotal_stlh_pajak AS bayar
             FROM main_transaksi mt
+            LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan
+            -- JOIN tabel yang sama
             LEFT JOIN karyawan k ON mt.id_resepsionis = k.id_karyawan
+            LEFT JOIN karyawan k_terapis ON mt.id_terapis = k_terapis.id_karyawan
+            LEFT JOIN karyawan k_gro ON mt.id_gro = k_gro.id_karyawan {kondisi}
           """
-          await cursor.execute(q1)  
+          await cursor.execute(q1, params)
           main_data = await cursor.fetchall()
 
           # Step 2, buat Workbook Excel. wb = WorkBook, ws = WorkSheet
@@ -287,7 +377,7 @@ async def exportExcel(
 
           # Step 3, Tambahkan Header kaya Judul lalu di Merge
           corporate_name = "PLATINUM"
-          ws.merge_cells('A1:K1') # Merge A1 smpe M1
+          ws.merge_cells('A1:I1') # Merge A1 smpe I1
           corp_cell = ws['A1']
           corp_cell.value = corporate_name
 
@@ -298,8 +388,8 @@ async def exportExcel(
             cell.font = header_font
 
           # Step 5, Tambah Keterangan dibawah nama korporat yg diheader A1
-          corporate_ket = "LAPORAN PENJUALAN"
-          ws.merge_cells('A2:K2')
+          corporate_ket = f"LAPORAN PENJUALAN PERIODE {tgl}"
+          ws.merge_cells('A2:I2')
           ket_cell = ws['A2']
           ket_cell.value = corporate_ket
 
@@ -312,17 +402,146 @@ async def exportExcel(
           # Buat Row Kosong
           ws.append([])
 
+          # Check if data is empty
+          if not main_data:
+            print("Transaksi Kosong")
+            return JSONResponse(
+              {"message": f"No transaction data found for {tgl}"},
+              status_code=500
+            )
+
           # Step 7 : Tambah Header. konversi ke string dlu
-          column_main = [str(col) for col in main_data[0].keys()]
+          column_main = []
+          for col in main_data[0].keys():
+            replaced_str = str(col).capitalize().replace("_", " ")
+            column_main.append(replaced_str)
+
           ws.append(column_main)
+
+          # Step 7.5 Desain Header. ws itu adalah worksheet row ke 4
+          header_row = ws[4] # Diambil dari row ke 4 yg udh di append pada step 7.5
+          for cell in header_row:
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.fill = PatternFill(start_color="D3D3D3", fill_type="solid")
+            cell.border = Border(
+              left=Side(style="thin"),
+              right=Side(style="thin"),
+              top=Side(style="thin"),
+              bottom=Side(style="thin"),
+            )
 
           # Step 8 : Tambah data ke ws. jadikan list dlu, br ambil values
           for row in main_data:
-            ws.append(list(row.values()))
+            row_as_str = []
+            for value in row.values():
+              if isinstance(value, datetime):
+                value = value.strftime('%d-%m-%Y\n%H:%M:%S')
+              elif isinstance(value, int):
+                value = value
+              elif isinstance(value, float):
+                value = str(value).replace("0.", "")
+                if value == "0":
+                  value = "-"
+                else:
+                  value += "0%"
+
+              elif value == "" or not value:
+                value = "-"
+              else:
+                value = str(value)
+              
+              row_as_str.append(value)
+            print(row_as_str)
+            ws.append(row_as_str)
+
+            # Step 8.5: Tambahkan border ke setiap row
+            thin_border = Border(
+              bottom=Side(style='thin')
+            )
+            
+            for row in ws.iter_rows(min_row=5, max_row=ws.max_row):  # Mulai dari row 5 (data pertama setelah header)
+              for cell in row:
+                cell.border = thin_border
 
           # Step 9 : Auto Adjust Column width berdasarkan konten
-          for col in ws.columns:
-            ws.column_dimensions[get_column_letter(col[0].column)].auto_size = True
+          for idx, col in enumerate(ws.columns, 1):  # Mulai dari 1 (kolom A)
+            column_letter = get_column_letter(idx)
+            max_length = 0
+            
+            for cell in col:
+              # Lewati looping yg mergedcell
+              if isinstance(cell, MergedCell):
+                continue
+              
+              try:
+                # Handle khusus untuk teks yang ada newline
+                cell_value = str(cell.value)
+
+                # Penanganan khusus untuk kolom id_transaksi (kolom pertama)
+                if idx == 1:  # Kolom A (id_transaksi)
+                  # Tetapkan panjang maksimum 8 karakter untuk id_transaksi
+                  max_length = 8
+                  break  # Keluar dari loop karena kita sudah tetapkan manual
+
+                elif "\n" in cell_value:
+                  # ambil line terpanjang
+                  line_lengths = [len(line) for line in cell_value.split("\n")]
+                  cell_length = max(line_lengths)
+                else:
+                  # buat lebar cell berdasarkan panjang data
+                  cell_length = len(cell_value)
+
+                if cell_length > max_length:
+                  max_length = len(str(cell.value))
+              except:
+                pass
+            
+            if idx == 1:
+              # Khusus id_transaksi ttpin 15 karakter
+              adjusted_width = 15
+            elif idx == 2:
+              # Tglbeli, 12 karakter aja
+              adjusted_width = 12
+            else:
+              # Kasih Buffer 20% dan minimum width 5
+              adjusted_width = max((max_length + 2) * 1.2, 5)
+
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+            for cell in col:
+              # aktifkan wraptext untuk kolom yang ada newline
+              if cell.value and "\n" in str(cell.value):
+                cell.alignment = Alignment(wrap_text=True)
+              # Format yg Bersifat Int
+              if isinstance(cell.value, int):
+                cell.alignment = Alignment(horizontal="right")
+                cell.number_format = '#,##0'
+
+          # After adding all your data rows (after the for row in main_data loop)
+          # Add an empty row for separation
+          ws.append([])
+
+          # Add the summary row. adjust yang len(column_main) - 3. klo mw perkecil, besarin  valuenya
+          summary_label = "TOTAL"
+          ws.append([summary_label] + [""] * (len(column_main) - 3) + ["", sum(row['bayar'] for row in main_data)])
+
+          # Style the summary row
+          summary_row = ws[ws.max_row]  # Get the last row
+          for cell in summary_row:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="D3D3D3", fill_type="solid")
+            cell.border = Border(
+              left=Side(style="thin"),
+              right=Side(style="thin"),
+              top=Side(style="thin"),
+              bottom=Side(style="thin"),
+            )
+
+          # Make the total value right-aligned and formatted with thousands separator
+          total_cell = ws.cell(row=ws.max_row, column=len(column_main))
+          total_cell.alignment = Alignment(horizontal="right")
+          total_cell.number_format = '#,##0'
 
           # Step 10 : Simpan Workbook Ke File
           file_path = "datapenjualan_platinum.xlsx"
@@ -333,11 +552,17 @@ async def exportExcel(
           wb.save(file_path)
           os.chmod(file_path, 0o444)  # Set back to read-only
 
+          # Panggil Fungsi excel_to_pdf yg manual aku buat
+          pdf_output = "datapenjualan_platinum.pdf"
+          excel_to_pdf(file_path, pdf_output)
+
+          await asyncio.sleep(1.0)
+
           # Step 11. Return Excelny sbg FileResponse
           return FileResponse(
-            file_path,
-            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            filename="datapenjualan_platinum.xlsx"
+            os.path.abspath("datapenjualan_platinum.pdf"),
+            media_type='application/pdf',
+            filename="datapenjualan_platinum.pdf"
           )
 
         except aiomysqlerror as e:

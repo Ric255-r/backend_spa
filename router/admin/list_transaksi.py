@@ -164,7 +164,7 @@ async def getDataTrans(
           kondisi_q1.append("DATE(mt.created_at) = CURDATE()")
           kondisi_q2.append("DATE(waktu_bayar) = CURDATE()")
 
-        elif hak_akses == "owner":
+        elif hak_akses == "owner" or hak_akses == "admin":
           if start_date and end_date:
             # Kondisi
             kondisi_q1.append("DATE(mt.created_at) BETWEEN %s and %s")
@@ -569,6 +569,48 @@ async def cancel_transaksi(
       content={"success": False, "error": f"Unexpected error: {str(e)}"},
       status_code=500
     )
+  
+@app.put('/update_fnb')
+async def update_idtrans_fnb(
+  request: Request
+) :
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try: 
+          await conn.begin()
+
+          data = await request.json()
+          current_id = data['current_id_trans']
+          new_id = data['new_id_trans']
+
+          q1 = """
+            UPDATE main_transaksi SET nama_tamu = %s WHERE id_transaksi = %s
+          """
+          await cursor.execute(q1, (new_id, current_id))
+          await conn.commit()
+          
+        except aiomysqlerror as e:  # Fixed typo from aiomysqlerror
+            await conn.rollback()
+            return JSONResponse(
+                content={"success": False, "error": f"Database error: {str(e)}"},
+                status_code=500
+            )
+        except HTTPException as e:
+            await conn.rollback()
+            return JSONResponse(
+                content={"success": False, "error": str(e.detail)},
+                status_code=e.status_code
+          )
+
+  except Exception as e:
+    return JSONResponse(
+      content={"success": False, "error": f"Unexpected error: {str(e)}"},
+      status_code=500
+    )
+  
 
 
 
