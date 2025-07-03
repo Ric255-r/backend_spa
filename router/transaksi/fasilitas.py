@@ -96,7 +96,8 @@ async def storeData(
 
           nominal_pjk = data['grand_total'] * item_q1['pajak_msg']
           gtotal_pjk_blm_round = data['grand_total'] + nominal_pjk
-          gtotal_stlh_pajak = round(gtotal_pjk_blm_round / 1000) * 1000
+          # gtotal_stlh_pajak = round(gtotal_pjk_blm_round / 1000) * 1000
+          gtotal_stlh_pajak = int(gtotal_pjk_blm_round / 1000 + 0.5) * 1000
 
           # false = awal
           if jenis_pembayaran == False:
