@@ -186,7 +186,7 @@ async def getDataTrans(
 
         q1 = f"""
           SELECT mt.*, COALESCE(r.nama_ruangan, '-') AS nama_ruangan FROM main_transaksi mt 
-          LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan WHERE {where_q1}
+          LEFT JOIN ruangan r ON mt.id_ruangan =  r.id_ruangan WHERE {where_q1}
           ORDER BY mt.id_transaksi ASC
         """
         print("Isi Q1 adalah ", q1)

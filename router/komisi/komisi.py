@@ -127,7 +127,7 @@ async def detailproduk(request : Request):
     pool = await get_db() # Get The pool
 
     async with pool.acquire() as conn:  # Auto Release
-      async with conn.cursor(aiomysql.DictCursor) as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:  
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
 
         data = await request.json()
@@ -242,7 +242,7 @@ async def getlistkomisi(request : Request):
 
         data = await request.json()
 
-        q1 = "SELECT id_karyawan, SUM(nominal_komisi) AS total_komisi FROM komisi WHERE nominal_komisi != 0 AND DATE(created_at) BETWEEN %s AND %s"
+        q1 = "SELECT id_karyawan, SUM(nominal_komisi) AS total_komisi FROM komisi WHERE nominal_komisi != 0 AND DATE(created_at) BETWEEN %s AND %s GROUP BY id_karyawan ORDER BY id_karyawan DESC"
         await cursor.execute(q1, (data['startdate'], data['enddate']))
         items = await cursor.fetchall()
 
