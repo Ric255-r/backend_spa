@@ -81,7 +81,7 @@ async def getMenu():
 
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
-        q1 = "SELECT * FROM menu_fnb"
+        q1 = "SELECT * FROM menu_fnb WHERE status_fnb = 'available'"
         await cursor.execute(q1)
 
         items = await cursor.fetchall()
