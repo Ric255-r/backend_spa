@@ -12,6 +12,7 @@ from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.cell import MergedCell
 from openpyxl.workbook.protection import WorkbookProtection
+from collections import defaultdict
 import pandas as pd
 from aiomysql import Error as aiomysqlerror
 import asyncio
@@ -563,6 +564,609 @@ async def exportExcel(
             os.path.abspath("datapenjualan_platinum.pdf"),
             media_type='application/pdf',
             filename="datapenjualan_platinum.pdf"
+          )
+
+        except aiomysqlerror as e:
+          return JSONResponse({"Error": f"Sql Error {str(e)}"}, status_code=500)
+        except HTTPException as e:
+          return JSONResponse({"Error": f"HTTP Error {str(e.detail)}"}, status_code=e.status_code)
+  except HTTPException as e:
+   return JSONResponse({"Error": str(e)}, status_code=e.status_code)
+
+@app.get('/export_excel_komisi_bulanan')
+async def exportExcel(
+  month: Optional[str] = Query(None),
+  year: Optional[str] = Query(None)
+):
+  try :
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try:
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+          kondisi = ""
+          params= []
+          # kondisi = "MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s"
+          params.extend([month, year, month, year, month, year])
+
+          print(params)
+          q1 = """
+
+            SELECT mt.id_transaksi, mt.created_at, dtp.id_paket as id_paket, pm.nama_paket_msg as nama_paket, pm.harga_paket_msg as harga_paket, dtp.qty, IF(LENGTH(CAST(pm.nominal_komisi as CHAR)) <=3, pm.nominal_komisi/100 * pm.harga_paket_msg * dtp.qty, pm.nominal_komisi * dtp.qty) AS komisi , k.nama_karyawan 
+            FROM main_transaksi as mt inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
+            inner join paket_massage as pm on dtp.id_paket = pm.id_paket_msg inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mt.status = 'done'
+
+            UNION ALL
+
+            SELECT mt.id_transaksi, mt.created_at, dtpr.id_produk as id_paket, mp.nama_produk as nama_paket, mp.harga_produk as harga_paket, dtpr.qty, IF(LENGTH(CAST(mp.nominal_komisi as CHAR)) <=3, mp.nominal_komisi/100 * mp.harga_produk * dtpr.qty, mp.nominal_komisi * dtpr.qty) AS komisi , k.nama_karyawan 
+            FROM main_transaksi as mt inner join detail_transaksi_produk as dtpr on mt.id_transaksi = dtpr.id_transaksi 
+            inner join menu_produk as mp on dtpr.id_produk = mp.id_produk inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mp.nominal_komisi != 0 AND mt.status = 'done'
+            
+            UNION ALL
+
+            SELECT mt.id_transaksi, mt.created_at, dtp.id_paket as id_paket, pe.nama_paket_extend as nama_paket, pe.harga_extend as harga_paket, dtp.qty, IF(LENGTH(CAST(pe.nominal_komisi as CHAR)) <=3, pe.nominal_komisi/100 * pe.harga_extend * dtp.qty , pe.nominal_komisi * dtp.qty ) AS komisi , k.nama_karyawan 
+            FROM main_transaksi as mt inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
+            inner join paket_extend as pe on dtp.id_paket = pe.id_paket_extend inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mt.status = 'done'
+
+            ORDER BY nama_karyawan, id_transaksi ASC
+
+          """
+
+          print(q1)
+          await cursor.execute(q1, params)
+          main_data_komisi = await cursor.fetchall()
+
+          print('data :',main_data_komisi)
+          # Step 2, buat Workbook Excel. wb = WorkBook, ws = WorkSheet
+          wb = Workbook()
+          ws = wb.active
+          ws.title = "Komisi Terapis & OB Bulanan "
+
+          grouped_data = defaultdict(list)
+          for row in main_data_komisi:
+            grouped_data[row['nama_karyawan']].append(row)
+
+          # Step 3, Tambahkan Header kaya Judul lalu di Merge
+          corporate_name = "PLATINUM"
+          ws.merge_cells('A1:H1') # Merge A1 smpe I1
+          corp_cell = ws['A1']
+          corp_cell.value = corporate_name
+          ws.row_dimensions[2].height = 30
+          ws.row_dimensions[1].height = 30
+
+          # Step 4, Center Text Corporate Name
+          corp_cell.alignment = Alignment(horizontal='center', vertical='center')
+          header_font = Font(bold=True, size=18)
+          for cell in ws[1]:# index row excel start dr 1. ini ceritany mw tebalin PLATINUM
+            cell.font = header_font
+
+          # Step 5, Tambah Keterangan dibawah nama korporat yg diheader A1
+          corporate_ket = f"LAPORAN KOMISI TERAPIS BULAN {month} TAHUN {year}"
+          ws.merge_cells('A2:H2')
+          ket_cell = ws['A2']
+          ket_cell.value = corporate_ket
+
+          # Step 6. Center Tulisan LapPenjualan
+          ket_cell.alignment = Alignment(horizontal='center', vertical='center')
+          header2_font = Font(bold=True, size=15)
+          for cell in ws[2]:
+            cell.font = header2_font
+
+          # Buat Row Kosong
+          ws.append([])
+
+          # Check if data is empty
+          if not grouped_data:
+            print("Transaksi Kosong")
+            return JSONResponse(
+              {"message": f"No transaction data found for month {month} and year {year}"},
+              status_code=500
+            )
+
+          # Step 7 : Tambah Header. konversi ke string dlu
+          column_main = []
+          first_row = list(grouped_data.values())[0][0]
+          #jadiin first_row untuk ambil keysnya
+          for col in first_row.keys():
+            replaced_str = str(col).capitalize().replace("_", " ")
+            column_main.append(replaced_str)
+
+          ws.append(column_main)
+
+          # Step 7.5 Desain Header. ws itu adalah worksheet row ke 4
+          header_row = ws[4] # Diambil dari row ke 4 yg udh di append pada step 7.5
+          for cell in header_row:
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.fill = PatternFill(start_color="D3D3D3", fill_type="solid")
+            cell.border = Border(
+              left=Side(style="thin"),
+              right=Side(style="thin"),
+              top=Side(style="thin"),
+              bottom=Side(style="thin"),
+            )
+          
+          for karyawan, rows in grouped_data.items():
+            ws.append(['Terapis :', karyawan])
+
+            total_komisi = 0
+            for r in rows :
+              formatted_komisi = "{:,.0f}".format(r['komisi']).replace(",", ".")
+              formatted_harga_paket = "{:,.0f}".format(r['harga_paket']).replace(",", ".")
+              formatted_time = r['created_at'].strftime('%d-%m-%Y %H:%M:%S')
+
+              ws.append([
+                r['id_transaksi'],
+                formatted_time,
+                r['id_paket'],
+                r['nama_paket'],
+                formatted_harga_paket,
+                r['qty'],
+                formatted_komisi,
+                r['nama_karyawan']
+              ])
+
+              last_row = ws.max_row
+              harga_cell =  ws.cell(row=last_row, column=5)
+              harga_cell.alignment = Alignment(horizontal='right')
+
+              komisi_cell =  ws.cell(row=last_row, column=7)
+              komisi_cell.alignment = Alignment(horizontal='right')
+
+              qty_cell = ws.cell(row=last_row, column=6)
+              qty_cell.alignment = Alignment(horizontal='center',vertical='center')
+              
+              total_komisi += r['komisi']
+              formatted_total_komisi = "{:,.0f}".format(total_komisi).replace(",", ".")
+            
+            ws.append(['TOTAL', '', '', '', '','', formatted_total_komisi, ''])
+            total_row_idx = ws.max_row #This points to the TOTAL row just added
+
+
+            for cell in ws[total_row_idx]:  # Second-to-last row is the "TOTAL" row
+              cell.font = Font(bold=True)
+              cell.alignment = Alignment(horizontal = 'right')  if cell.column == 7 else Alignment(horizontal = 'center')
+              ws.merge_cells(start_column=1,start_row= total_row_idx,end_row=total_row_idx, end_column=5)
+              ws.append([])
+
+          # Step 8 : Tambah data ke ws. jadikan list dlu, br ambil values
+          # for row in grouped_data.values():
+          #   for row in rows:
+          #     row_as_str = []
+          #     for value in row:
+          #       if isinstance(value, datetime):
+          #         value = value.strftime('%d-%m-%Y\n%H:%M:%S')
+          #       elif isinstance(value, int):
+          #         value = value
+          #       elif isinstance(value, float):
+          #         value = str(value).replace("0.", "")
+          #         if value == "0":
+          #           value = "-"
+          #         else:
+          #           value += "0%"
+
+          #       elif value == "" or not value:
+          #         value = "-"
+          #       else:
+          #         value = str(value)
+                
+          #       row_as_str.append(value)
+          #     print(row_as_str)
+          #     ws.append(row_as_str)
+
+            # Step 8.5: Tambahkan border ke setiap row
+            thin_border = Border(
+              bottom=Side(style='thin')
+            )
+            
+            for row in ws.iter_rows(min_row=5, max_row=ws.max_row):  # Mulai dari row 5 (data pertama setelah header)
+              for cell in row:
+                cell.border = thin_border
+
+          # Step 9 : Auto Adjust Column width berdasarkan konten
+          for idx, col in enumerate(ws.columns, 1):  # Mulai dari 1 (kolom A)
+            column_letter = get_column_letter(idx)
+            max_length = 0
+            
+            for cell in col:
+              # Lewati looping yg mergedcell
+              if isinstance(cell, MergedCell):
+                continue
+              
+              try:
+                # Handle khusus untuk teks yang ada newline
+                cell_value = str(cell.value)
+
+                # Penanganan khusus untuk kolom id_transaksi (kolom pertama)
+                if idx == 1:  # Kolom A (id_transaksi)
+                  # Tetapkan panjang maksimum 8 karakter untuk id_transaksi
+                  max_length = 8
+                  break  # Keluar dari loop karena kita sudah tetapkan manual
+
+                elif "\n" in cell_value:
+                  # ambil line terpanjang
+                  line_lengths = [len(line) for line in cell_value.split("\n")]
+                  cell_length = max(line_lengths)
+                else:
+                  # buat lebar cell berdasarkan panjang data
+                  cell_length = len(cell_value)
+
+                if cell_length > max_length:
+                  max_length = len(str(cell.value))
+              except:
+                pass
+            
+            if idx == 1:
+              # Khusus id_transaksi ttpin 15 karakter
+              adjusted_width = 15
+            elif idx == 2:
+              # Tglbeli, 12 karakter aja
+              adjusted_width = 20
+            else:
+              # Kasih Buffer 20% dan minimum width 5
+              adjusted_width = max((max_length + 2) * 1.2, 5)
+
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+            for cell in col:
+              # aktifkan wraptext untuk kolom yang ada newline
+              if cell.value and "\n" in str(cell.value):
+                cell.alignment = Alignment(wrap_text=True)
+              # Format yg Bersifat Int
+             
+          # After adding all your data rows (after the for row in main_data loop)
+          # Add an empty row for separation
+          ws.append([])
+
+          # Add the summary row. adjust yang len(column_main) - 3. klo mw perkecil, besarin  valuenya
+          summary_label = "TOTAL SELURUH KOMISI"
+          total_komisi = sum(float(row['komisi']) for rows in grouped_data.values() for row in rows)
+          formattedkomisi = "{:,.0f}".format(total_komisi).replace(",", ".")
+          
+          ws.append([summary_label] + [""] * (len(column_main) - 4) + ["", formattedkomisi])
+
+          # Style the summary row
+          summary_row_idx = ws.max_row  # Get the last row
+          ws.merge_cells(start_row=summary_row_idx, start_column=1, end_row=summary_row_idx, end_column=2)
+
+          summary_row = ws[summary_row_idx]
+          for cell in summary_row:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="D3D3D3", fill_type="solid")
+            cell.alignment = Alignment(horizontal='center', vertical= 'center')
+            cell.border = Border(
+              left=Side(style="thin"),
+              right=Side(style="thin"),
+              top=Side(style="thin"),
+              bottom=Side(style="thin"),
+            )
+
+          # Make the total value right-aligned and formatted with thousands separator
+          total_cell = ws.cell(row=ws.max_row, column=len(column_main))
+          total_cell.alignment = Alignment(horizontal="right")
+          total_cell.number_format = '#,##0'
+
+          # Step 10 : Simpan Workbook Ke File
+          file_path = "datakomisiterapisbulanan.xlsx"
+          # Temporarily Make File Writable Before Overwriting
+          if os.path.exists(file_path):
+            os.chmod(file_path, 0o644)  # Grant write permissions (rw-r--r--)
+
+          wb.save(file_path)
+          os.chmod(file_path, 0o444)  # Set back to read-only
+
+          # Panggil Fungsi excel_to_pdf yg manual aku buat
+          pdf_output = "data_komisi_terapis_bulanan.pdf"
+          excel_to_pdf(file_path, pdf_output)
+
+          await asyncio.sleep(1.0)
+
+          # # Step 11. Return Excelny sbg FileResponse
+          return FileResponse(
+            os.path.abspath(pdf_output),
+            media_type='application/pdf',
+            filename="data_komisi_terapis_bulanan.pdf"
+          )
+
+        except aiomysqlerror as e:
+          return JSONResponse({"Error": f"Sql Error {str(e)}"}, status_code=500)
+        except HTTPException as e:
+          return JSONResponse({"Error": f"HTTP Error {str(e.detail)}"}, status_code=e.status_code)
+  except HTTPException as e:
+   return JSONResponse({"Error": str(e)}, status_code=e.status_code)
+
+@app.get('/export_excel_komisi_bulanan_gro')
+async def exportExcel(
+  month: Optional[str] = Query(None),
+  year: Optional[str] = Query(None)
+):
+  try :
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try:
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+          kondisi = ""
+          params= []
+          # kondisi = "MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s"
+          params.extend([month, year, month, year])
+
+          print(params)
+          q1 = """
+
+            SELECT mt.id_transaksi, mt.created_at, dtp.id_paket as id_paket, pm.nama_paket_msg as nama_paket, pm.harga_paket_msg as harga_paket, dtp.qty, IF(LENGTH(CAST(pm.nominal_komisi_gro as CHAR)) <=3, pm.nominal_komisi_gro/100 * pm.harga_paket_msg * dtp.qty, pm.nominal_komisi_gro * dtp.qty) AS komisi , k.nama_karyawan 
+            FROM main_transaksi as mt inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
+            inner join paket_massage as pm on dtp.id_paket = pm.id_paket_msg inner join karyawan as k on mt.id_gro = k.id_karyawan WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND pm.nominal_komisi_gro != 0 AND mt.status = 'done' AND dtp.is_addon = 0
+
+            UNION ALL
+
+            SELECT mt.id_transaksi, mt.created_at, dtpr.id_produk as id_paket, mp.nama_produk as nama_paket, mp.harga_produk as harga_paket, dtpr.qty, IF(LENGTH(CAST(mp.nominal_komisi_gro as CHAR)) <=3, mp.nominal_komisi_gro/100 * mp.harga_produk * dtpr.qty, mp.nominal_komisi_gro * dtpR.qty) AS komisi , k.nama_karyawan 
+            FROM main_transaksi as mt inner join detail_transaksi_produk as dtpr on mt.id_transaksi = dtpr.id_transaksi 
+            inner join menu_produk as mp on dtpr.id_produk = mp.id_produk inner join karyawan as k on mt.id_gro = k.id_karyawan WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mp.nominal_komisi_gro != 0 AND mt.status = 'done' AND dtpr.is_addon = 0
+
+            ORDER BY nama_karyawan, id_transaksi ASC
+
+          """
+
+          print(q1)
+          await cursor.execute(q1, params)
+          main_data_komisi = await cursor.fetchall()
+
+          print('data :',main_data_komisi)
+          # Step 2, buat Workbook Excel. wb = WorkBook, ws = WorkSheet
+          wb = Workbook()
+          ws = wb.active
+          ws.title = "Komisi GRO Bulanan "
+
+          grouped_data = defaultdict(list)
+          for row in main_data_komisi:
+            grouped_data[row['nama_karyawan']].append(row)
+
+          # Step 3, Tambahkan Header kaya Judul lalu di Merge
+          corporate_name = "PLATINUM"
+          ws.merge_cells('A1:H1') # Merge A1 smpe I1
+          corp_cell = ws['A1']
+          corp_cell.value = corporate_name
+          ws.row_dimensions[2].height = 30
+          ws.row_dimensions[1].height = 30
+
+          # Step 4, Center Text Corporate Name
+          corp_cell.alignment = Alignment(horizontal='center', vertical='center')
+          header_font = Font(bold=True, size=18)
+          for cell in ws[1]:# index row excel start dr 1. ini ceritany mw tebalin PLATINUM
+            cell.font = header_font
+
+          # Step 5, Tambah Keterangan dibawah nama korporat yg diheader A1
+          corporate_ket = f"LAPORAN KOMISI GRO BULAN {month} TAHUN {year}"
+          ws.merge_cells('A2:H2')
+          ket_cell = ws['A2']
+          ket_cell.value = corporate_ket
+
+          # Step 6. Center Tulisan LapPenjualan
+          ket_cell.alignment = Alignment(horizontal='center', vertical='center')
+          header2_font = Font(bold=True, size=15)
+          for cell in ws[2]:
+            cell.font = header2_font
+
+          # Buat Row Kosong
+          ws.append([])
+
+          # Check if data is empty
+          if not grouped_data:
+            print("Transaksi Kosong")
+            return JSONResponse(
+              {"message": f"No transaction data found for month {month} and year {year}"},
+              status_code=500
+            )
+
+          # Step 7 : Tambah Header. konversi ke string dlu
+          column_main = []
+          first_row = list(grouped_data.values())[0][0]
+          #jadiin first_row untuk ambil keysnya
+          for col in first_row.keys():
+            replaced_str = str(col).capitalize().replace("_", " ")
+            column_main.append(replaced_str)
+
+          ws.append(column_main)
+
+          # Step 7.5 Desain Header. ws itu adalah worksheet row ke 4
+          header_row = ws[4] # Diambil dari row ke 4 yg udh di append pada step 7.5
+          for cell in header_row:
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.fill = PatternFill(start_color="D3D3D3", fill_type="solid")
+            cell.border = Border(
+              left=Side(style="thin"),
+              right=Side(style="thin"),
+              top=Side(style="thin"),
+              bottom=Side(style="thin"),
+            )
+          
+          for karyawan, rows in grouped_data.items():
+            ws.append(['Terapis :', karyawan])
+
+            total_komisi = 0
+            for r in rows :
+              formatted_komisi = "{:,.0f}".format(r['komisi']).replace(",", ".")
+              formatted_harga_paket = "{:,.0f}".format(r['harga_paket']).replace(",", ".")
+              formatted_time = r['created_at'].strftime('%d-%m-%Y %H:%M:%S')
+
+              ws.append([
+                r['id_transaksi'],
+                formatted_time,
+                r['id_paket'],
+                r['nama_paket'],
+                formatted_harga_paket,
+                r['qty'],
+                formatted_komisi,
+                r['nama_karyawan']
+              ])
+
+              last_row = ws.max_row
+              harga_cell =  ws.cell(row=last_row, column=5)
+              harga_cell.alignment = Alignment(horizontal='right')
+
+              komisi_cell =  ws.cell(row=last_row, column=7)
+              komisi_cell.alignment = Alignment(horizontal='right')
+
+              qty_cell = ws.cell(row=last_row, column=6)
+              qty_cell.alignment = Alignment(horizontal='center',vertical='center')
+              
+              total_komisi += r['komisi']
+              formatted_total_komisi = "{:,.0f}".format(total_komisi).replace(",", ".")
+            
+            ws.append(['TOTAL', '', '', '', '', formatted_total_komisi, ''])
+            total_row_idx = ws.max_row #This points to the TOTAL row just added
+
+
+            for cell in ws[total_row_idx]:  # Second-to-last row is the "TOTAL" row
+              cell.font = Font(bold=True)
+              cell.alignment = Alignment(horizontal = 'right')  if cell.column == 6 else Alignment(horizontal = 'center')
+              ws.merge_cells(start_column=1,start_row= total_row_idx,end_row=total_row_idx, end_column=5)
+            ws.append([])
+
+          # Step 8 : Tambah data ke ws. jadikan list dlu, br ambil values
+          # for row in grouped_data.values():
+          #   for row in rows:
+          #     row_as_str = []
+          #     for value in row:
+          #       if isinstance(value, datetime):
+          #         value = value.strftime('%d-%m-%Y\n%H:%M:%S')
+          #       elif isinstance(value, int):
+          #         value = value
+          #       elif isinstance(value, float):
+          #         value = str(value).replace("0.", "")
+          #         if value == "0":
+          #           value = "-"
+          #         else:
+          #           value += "0%"
+
+          #       elif value == "" or not value:
+          #         value = "-"
+          #       else:
+          #         value = str(value)
+                
+          #       row_as_str.append(value)
+          #     print(row_as_str)
+          #     ws.append(row_as_str)
+
+            # Step 8.5: Tambahkan border ke setiap row
+            thin_border = Border(
+              bottom=Side(style='thin')
+            )
+            
+            for row in ws.iter_rows(min_row=5, max_row=ws.max_row):  # Mulai dari row 5 (data pertama setelah header)
+              for cell in row:
+                cell.border = thin_border
+
+          # Step 9 : Auto Adjust Column width berdasarkan konten
+          for idx, col in enumerate(ws.columns, 1):  # Mulai dari 1 (kolom A)
+            column_letter = get_column_letter(idx)
+            max_length = 0
+            
+            for cell in col:
+              # Lewati looping yg mergedcell
+              if isinstance(cell, MergedCell):
+                continue
+              
+              try:
+                # Handle khusus untuk teks yang ada newline
+                cell_value = str(cell.value)
+
+                # Penanganan khusus untuk kolom id_transaksi (kolom pertama)
+                if idx == 1:  # Kolom A (id_transaksi)
+                  # Tetapkan panjang maksimum 8 karakter untuk id_transaksi
+                  max_length = 8
+                  break  # Keluar dari loop karena kita sudah tetapkan manual
+
+                elif "\n" in cell_value:
+                  # ambil line terpanjang
+                  line_lengths = [len(line) for line in cell_value.split("\n")]
+                  cell_length = max(line_lengths)
+                else:
+                  # buat lebar cell berdasarkan panjang data
+                  cell_length = len(cell_value)
+
+                if cell_length > max_length:
+                  max_length = len(str(cell.value))
+              except:
+                pass
+            
+            if idx == 1:
+              # Khusus id_transaksi ttpin 15 karakter
+              adjusted_width = 15
+            elif idx == 2:
+              # Tglbeli, 12 karakter aja
+              adjusted_width = 20
+            else:
+              # Kasih Buffer 20% dan minimum width 5
+              adjusted_width = max((max_length + 2) * 1.2, 5)
+
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+            for cell in col:
+              # aktifkan wraptext untuk kolom yang ada newline
+              if cell.value and "\n" in str(cell.value):
+                cell.alignment = Alignment(wrap_text=True)
+              # Format yg Bersifat Int
+              if isinstance(cell.value, int):
+                cell.alignment = Alignment(horizontal="right")
+                cell.number_format = '#,##0'
+
+          # After adding all your data rows (after the for row in main_data loop)
+          # Add an empty row for separation
+          ws.append([])
+
+          # Add the summary row. adjust yang len(column_main) - 3. klo mw perkecil, besarin  valuenya
+          summary_label = "TOTAL SELURUH KOMISI"
+          total_komisi = sum(float(row['komisi']) for rows in grouped_data.values() for row in rows)
+          formattedkomisi = "{:,.0f}".format(total_komisi).replace(",", ".")
+          
+          ws.append([summary_label] + [""] * (len(column_main) - 4) + ["", formattedkomisi])
+
+          # Style the summary row
+          summary_row_idx = ws.max_row  # Get the last row
+          ws.merge_cells(start_row=summary_row_idx, start_column=1, end_row=summary_row_idx, end_column=2)
+
+          summary_row = ws[summary_row_idx]
+          for cell in summary_row:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="D3D3D3", fill_type="solid")
+            cell.alignment = Alignment(horizontal='center', vertical= 'center')
+            cell.border = Border(
+              left=Side(style="thin"),
+              right=Side(style="thin"),
+              top=Side(style="thin"),
+              bottom=Side(style="thin"),
+            )
+
+          # Make the total value right-aligned and formatted with thousands separator
+          total_cell = ws.cell(row=ws.max_row, column=len(column_main))
+          total_cell.alignment = Alignment(horizontal="right")
+          total_cell.number_format = '#,##0'
+
+          # Step 10 : Simpan Workbook Ke File
+          file_path = "datakomisigrobulanan.xlsx"
+          # Temporarily Make File Writable Before Overwriting
+          if os.path.exists(file_path):
+            os.chmod(file_path, 0o644)  # Grant write permissions (rw-r--r--)
+
+          wb.save(file_path)
+          os.chmod(file_path, 0o444)  # Set back to read-only
+
+          # Panggil Fungsi excel_to_pdf yg manual aku buat
+          pdf_output = "data_komisi_gro_bulanan.pdf"
+          excel_to_pdf(file_path, pdf_output)
+
+          await asyncio.sleep(1.0)
+
+          # # Step 11. Return Excelny sbg FileResponse
+          return FileResponse(
+            os.path.abspath(pdf_output),
+            media_type='application/pdf',
+            filename="data_komisi_gro_bulanan.pdf"
           )
 
         except aiomysqlerror as e:

@@ -251,7 +251,6 @@ async def getqtypaket(
     return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
 
 
-
 @app.get('/getkomisiproduk')
 async def getkomisiproduk(
   request: Request
