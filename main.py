@@ -1,5 +1,6 @@
 import os
-from fastapi import Depends, FastAPI, APIRouter, Security, HTTPException
+import ipaddress
+from fastapi import Depends, FastAPI, APIRouter, Request, Security, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi_jwt import JwtAuthorizationCredentials
@@ -65,6 +66,46 @@ os.makedirs(KONTRAK_DIR, exist_ok=True)
 app.mount("/listpekerja/kontrak", StaticFiles(directory=KONTRAK_DIR), name="kontrak")
 
 app.mount("/qrcodes", StaticFiles(directory="qrcodes"), name="qrcodes")
+
+# IP FILTERING CODE UTK KEAMANAN
+ALLOWED_IPS = [
+  "127.0.0.1"
+]
+
+# Ijinkan IP Tailscale
+ALLOWED_NETWORK = [
+  ipaddress.ip_network("100.64.0.0/10") # Tailscale CGNAT Range
+]
+
+@app.middleware("http")
+async def ip_filter_mdw(
+  request: Request,
+  call_next
+) :
+  client_ip_str = request.client.host
+  is_allowed = False
+
+  if client_ip_str in ALLOWED_IPS:
+    is_allowed = True
+  else:
+    try:
+      client_ip = ipaddress.ip_address(client_ip_str)
+      for network in ALLOWED_NETWORK:
+        if client_ip in network:
+          is_allowed = True
+          break
+    except ValueError:
+      print(f"Warning. Ga bs Parse IP {client_ip_str} sebagai IP")
+    
+  if not is_allowed:
+    print(f"Forbidden: Denying access for IP {client_ip_str}")
+    raise HTTPException(status_code=403, detail=f"IP address {client_ip_str} is not allowed")
+
+  print(f"Allowed: Granting access for IP {client_ip_str}")
+  response = await call_next(request)
+  return response
+# END IP FILTERING
+
 app.add_middleware(
   CORSMiddleware,
   allow_origins=["*"],
@@ -135,4 +176,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="192.168.7.252", port=5500)
+  uvicorn.run(app, host="0.0.0.0", port=5500)

@@ -350,7 +350,7 @@ async def exportExcel(
             params.append(start_date)            
           else:
             kondisi = "WHERE DATE(mt.created_at) = CURDATE()"
-            # Ambil Date Now Skrg
+            # Ambil Date Now Skrg (sesuai server db)
             q_tgl = "SELECT NOW() AS tgl"
             await cursor.execute(q_tgl)
 
@@ -441,11 +441,10 @@ async def exportExcel(
               elif isinstance(value, int):
                 value = value
               elif isinstance(value, float):
-                value = str(value).replace("0.", "")
-                if value == "0":
+                if value == 0.0:
                   value = "-"
                 else:
-                  value += "0%"
+                  value = f"{int(value * 100)}%"
 
               elif value == "" or not value:
                 value = "-"
@@ -561,7 +560,7 @@ async def exportExcel(
 
           # Step 11. Return Excelny sbg FileResponse
           return FileResponse(
-            os.path.abspath("datapenjualan_platinum.pdf"),
+            os.path.abspath(pdf_output),
             media_type='application/pdf',
             filename="datapenjualan_platinum.pdf"
           )
@@ -574,7 +573,7 @@ async def exportExcel(
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
 
 @app.get('/export_excel_komisi_bulanan')
-async def exportExcel(
+async def export_excel_komisi_bulanan(
   month: Optional[str] = Query(None),
   year: Optional[str] = Query(None)
 ):
@@ -877,7 +876,7 @@ async def exportExcel(
    return JSONResponse({"Error": str(e)}, status_code=e.status_code)
 
 @app.get('/export_excel_komisi_bulanan_gro')
-async def exportExcel(
+async def export_excel_komisi_bulanan_gro(
   month: Optional[str] = Query(None),
   year: Optional[str] = Query(None)
 ):
