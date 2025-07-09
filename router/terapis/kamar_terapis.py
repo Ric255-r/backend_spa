@@ -439,6 +439,7 @@ async def insert_datang(
       async with conn.cursor(aiomysql.DictCursor) as cursor:
         try:
           await conn.begin()
+          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
 
           data = await request.json()
 
@@ -463,7 +464,15 @@ async def insert_datang(
             await cursor.execute(q1, (data['id_transaksi'], data['id_terapis'], jam_datang))
             await conn.commit()
 
-          await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+            # REFETCH after insert
+            await cursor.execute(qCheck, (data['id_transaksi'], data['id_terapis']))
+            items = await cursor.fetchone()
+
+            if not items:
+              raise HTTPException(status_code=500, detail="Failed to retrieve inserted record.")
+            # End Refetch
+
+          # Disini Awalnya ku ksh Transaction Isolation. ku pindahkan paling atas          
           q2 = """
             SELECT mt.*, r.nama_ruangan FROM main_transaksi mt
             INNER JOIN ruangan r ON mt.id_ruangan = r.id_ruangan 
