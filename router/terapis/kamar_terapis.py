@@ -818,6 +818,9 @@ async def selesai(
             mode = 'done-unpaid'
           elif total_addon == 0 and status == 'unpaid':
             mode = 'done-unpaid'
+          else:
+            if status in ["done", "done-unpaid", "done-unpaid-addon"]:
+              mode = status
           
           print("Mode Pas Selesai Kamar", mode)
           q1 = f"""

@@ -74,7 +74,10 @@ ALLOWED_IPS = [
 
 # Ijinkan IP Tailscale
 ALLOWED_NETWORK = [
-  ipaddress.ip_network("100.64.0.0/10") # Tailscale CGNAT Range
+  ipaddress.ip_network("100.64.0.0/10"), # Tailscale CGNAT Range
+  ipaddress.ip_network("192.168.100.0/24"),
+  ipaddress.ip_network("192.168.1.0/24"),
+  # ipaddress.ip_network("172.16.0.0/16")
 ]
 
 @app.middleware("http")
