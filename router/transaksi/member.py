@@ -338,8 +338,6 @@ async def store_tahunan(request: Request):
                         {pjk},
                         data.get('keterangan', '-'),
                     ))
-                    item = await cursor.fetchall()
-                    print(item)
 
                     await conn.commit()
                     return {"status": "Success", "message": "Tahunan promo applied"}

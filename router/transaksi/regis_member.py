@@ -56,7 +56,7 @@ async def postMember(
                     # 5. Commit Transaction
                     await conn.commit()
                     await asyncio.sleep(0.2)
-                    qr_url = f"http://192.168.1.13:5500/qrcodes/{nama}_qrcode.png"
+                    qr_url = f"http://0.0.0.0:5500/qrcodes/{nama}_qrcode.png"
                     return JSONResponse(content={
                     "status": "Success",
                     "message": f"Data Berhasil Diinput dengan ID {id_member}",
