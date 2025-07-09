@@ -190,8 +190,9 @@ async def getLatestTrans(
               m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
             AND 
               m.is_cancel = 0
+              -- ak tambahin string kosong krn mrk msh gegabah. suka keluar dari aplikasi 
             AND
-              m.status NOT IN ('done', 'done-unpaid-addon', 'done-unpaid', 'draft')
+              m.status NOT IN ('done', 'done-unpaid-addon', 'done-unpaid', 'draft', '')
             AND 
               dtpa.is_returned != 1
             {'AND m.id_transaksi = %s' if id_trans is not None else ''}
@@ -234,7 +235,8 @@ async def getLatestTrans(
             WHERE m.id_ruangan = %s AND m.sedang_dikerjakan = {'FALSE' if id_trans is None else 'TRUE'}
             AND 
               m.is_cancel = 0
-            AND m.status NOT IN ('done', 'done-unpaid', 'done-unpaid-addon', 'draft')
+              -- ak tambahin string kosong krn mrk msh gegabah. suka keluar dari aplikasi 
+            AND m.status NOT IN ('done', 'done-unpaid', 'done-unpaid-addon', 'draft', '')
             {'AND m.id_transaksi = %s' if id_trans is not None else ''}
             ORDER BY m.created_at DESC
           """ 
