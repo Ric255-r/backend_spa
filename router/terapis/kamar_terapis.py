@@ -17,6 +17,30 @@ from jwt_auth import access_security, refresh_security
 from datetime import timedelta
 import traceback
 import asyncio
+import logging
+
+# Buat File Logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+
+# Buat Nama Handler
+file_handler = logging.FileHandler("anomali_log.txt")
+file_handler.setLevel(logging.WARNING) # Only log WARNING and higher to the file
+
+# Buat Formatter lalu tambah ke file handler
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# tambah file handler ke logger
+logger.addHandler(file_handler)
+
+# Secara Opsional, lalu log ke konsol
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+# End Konfigurasi Logging
+
 
 app = APIRouter(
   prefix="/kamar_terapis"
@@ -832,6 +856,13 @@ async def selesai(
           else:
             if status in ["done", "done-unpaid", "done-unpaid-addon"]:
               mode = status
+            else:
+              log_message = (
+                f"INFO: Id Transaction '{data['id_transaksi']}' already in a final state "
+                f"Status di main_transaksi '{status}' (total_addon: {total_addon}). "
+                f"Variabel Mode ada di {mode}"
+              )
+              logger.info(log_message)
           
           print("Mode Pas Selesai Kamar", mode)
           q1 = f"""
