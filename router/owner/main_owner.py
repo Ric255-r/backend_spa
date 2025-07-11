@@ -112,24 +112,22 @@ async def getLaporan() :
         # Penjualan Paket. ambil dari gtotal_stlh_pajak yg main_transaksi. 
         q3 = f"""
           {queryWith}
-          SELECT 
-              m.bulan, 
-              IFNULL(SUM(dtp.harga_total), 0) AS omset_jual_paket,
-              t.id_transaksi, dtp.is_addon, t.jenis_pembayaran
-          FROM 
+          SELECT
+              m.bulan,
+              -- 1. Mengganti kolom menjadi gtotal_stlh_pajak
+              IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_jual_paket
+          FROM
               months m
-          LEFT JOIN 
+          LEFT JOIN
               main_transaksi t ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan
-              AND t.status IN ('paid', 'done')  -- Only count completed transactions
+              AND t.status IN ('paid', 'done')
               AND t.is_cancel = 0
-          LEFT JOIN 
-              detail_transaksi_paket dtp ON t.id_transaksi = dtp.id_transaksi
-              AND dtp.status = 'paid'  -- Only count paid package items
-              AND dtp.is_returned = 0  -- Exclude returned items
-          GROUP BY 
-              m.bulan, t.id_transaksi, dtp.is_addon, t.jenis_pembayaran
-          ORDER BY 
-              m.bulan DESC
+              -- 2. Mengganti filter EXISTS dengan jenis_transaksi
+              AND t.jenis_transaksi = 'massage'
+          GROUP BY
+              m.bulan
+          ORDER BY
+              m.bulan DESC;
         """
         await cursor.execute(q3)
         items3 = await cursor.fetchall()
