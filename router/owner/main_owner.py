@@ -115,7 +115,7 @@ async def getLaporan() :
           SELECT
               m.bulan,
               -- 1. Mengganti kolom menjadi gtotal_stlh_pajak
-              IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_jual_paket
+              IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_bulanan
           FROM
               months m
           LEFT JOIN
@@ -132,45 +132,45 @@ async def getLaporan() :
         await cursor.execute(q3)
         items3 = await cursor.fetchall()
 
-        penjualan_paket = []
-        for data in items3:
-          id_transaksi = data['id_transaksi']
-          omset_jual_paket = int(data['omset_jual_paket']) or 0
+        # penjualan_paket = []
+        # for data in items3:
+        #   id_transaksi = data['id_transaksi']
+        #   omset_jual_paket = int(data['omset_jual_paket']) or 0
 
-          # ambil key id_transaksi di maintrans yg sama dgn data['id_transaksi']
-          get_same_id = main_trans_dict.get(id_transaksi, {}) #klo g ad return obj kosong
-          disc = float(get_same_id.get('disc', 0)) #klo g ad maka 0
+        #   # ambil key id_transaksi di maintrans yg sama dgn data['id_transaksi']
+        #   get_same_id = main_trans_dict.get(id_transaksi, {}) #klo g ad return obj kosong
+        #   disc = float(get_same_id.get('disc', 0)) #klo g ad maka 0
           
-          # Rumus Persen
-          # if data['jenis_pembayaran'] == 1:
-          #   # Case 1: Bayar diakhir, pasti dpt disc
-          #   nominal_disc = omset_jual_paket * disc
-          #   harga_stlh_disc = omset_jual_paket - nominal_disc
-          # elif data['jenis_pembayaran'] == 0 and data['is_addon'] == 0:
-          #   # Case 2: Payment upfront - only apply discount to non-addon items
-          #   nominal_disc = omset_jual_paket * disc
-          #   harga_stlh_disc = omset_jual_paket - nominal_disc
-          # else:
-          #   # Ga dpt disc (bayar diawal. addon g dpt)
-          #   harga_stlh_disc = omset_jual_paket
+        #   # Rumus Persen
+        #   # if data['jenis_pembayaran'] == 1:
+        #   #   # Case 1: Bayar diakhir, pasti dpt disc
+        #   #   nominal_disc = omset_jual_paket * disc
+        #   #   harga_stlh_disc = omset_jual_paket - nominal_disc
+        #   # elif data['jenis_pembayaran'] == 0 and data['is_addon'] == 0:
+        #   #   # Case 2: Payment upfront - only apply discount to non-addon items
+        #   #   nominal_disc = omset_jual_paket * disc
+        #   #   harga_stlh_disc = omset_jual_paket - nominal_disc
+        #   # else:
+        #   #   # Ga dpt disc (bayar diawal. addon g dpt)
+        #   #   harga_stlh_disc = omset_jual_paket
 
-          # Update key items3
-          data['omset_jual_paket'] = omset_jual_paket
-          penjualan_paket.append(data)
+        #   # Update key items3
+        #   data['omset_jual_paket'] = omset_jual_paket
+        #   penjualan_paket.append(data)
 
-        # GroupBy valuenya berdasarkan key bulan
-        monthly_paket = {}
-        for entry in penjualan_paket:
-          bulan = entry['bulan']
-          if bulan in monthly_paket:
-            monthly_paket[bulan] += entry['omset_jual_paket']
-          else:
-            monthly_paket[bulan] = entry['omset_jual_paket']
+        # # GroupBy valuenya berdasarkan key bulan
+        # monthly_paket = {}
+        # for entry in penjualan_paket:
+        #   bulan = entry['bulan']
+        #   if bulan in monthly_paket:
+        #     monthly_paket[bulan] += entry['omset_jual_paket']
+        #   else:
+        #     monthly_paket[bulan] = entry['omset_jual_paket']
 
-        # restruktur ulang dictionarynya, lalujadikan dataframe biar bentuk kek tabel sql
-        monthly_paket_df = {'bulan': list(monthly_paket.keys()), 'omset_bulanan': list(monthly_paket.values())}
-        df_paket = pd.DataFrame(monthly_paket_df)
-        # End Penjualan Paket
+        # # restruktur ulang dictionarynya, lalujadikan dataframe biar bentuk kek tabel sql
+        # monthly_paket_df = {'bulan': list(monthly_paket.keys()), 'omset_bulanan': list(monthly_paket.values())}
+        # df_paket = pd.DataFrame(monthly_paket_df)
+        # # End Penjualan Paket
 
         q4 = f"""
           {queryWith}
@@ -252,7 +252,7 @@ async def getLaporan() :
         return {
           "for_line_chart" : items1,
           "monthly_sales": items2,
-          "sum_paket": df_paket.to_dict('records'),
+          "sum_paket": items3,
           "sum_produk": df_produk.to_dict('records'),
           "paket_terlaris": items5
         }
