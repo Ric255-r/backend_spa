@@ -342,11 +342,11 @@ async def exportExcel(
           if start_date and end_date:
             tgl = formatStrDate(start_date) + " s/d " + formatStrDate(end_date)
             # kalo utk kondisi formatny hrs sesuai dgn sql yaitu yyyy-mm-dd
-            kondisi = "WHERE DATE(mt.created_at) BETWEEN %s AND %s"
+            kondisi = "WHERE DATE(mt.created_at) BETWEEN %s AND %s AND mt.is_cancel = 0 AND mt.status in ('paid', 'done')"
             params.extend([start_date, end_date])
           elif start_date:
             tgl = formatStrDate(start_date)
-            kondisi = "WHERE DATE(mt.created_at) = %s"
+            kondisi = "WHERE DATE(mt.created_at) = %s AND mt.is_cancel = 0 AND mt.status in ('paid', 'done')"
             params.append(start_date)            
           else:
             kondisi = "WHERE DATE(mt.created_at) = CURDATE()"
