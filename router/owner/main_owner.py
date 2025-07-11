@@ -101,7 +101,7 @@ async def getLaporan() :
           FROM months m
           LEFT JOIN main_transaksi t 
             ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan 
-            AND t.is_cancel = 0
+            AND t.status IN ('done', 'paid') AND t.is_cancel = 0
 
           GROUP BY m.bulan
           ORDER BY m.bulan DESC
