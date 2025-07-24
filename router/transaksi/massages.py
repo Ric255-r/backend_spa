@@ -502,3 +502,57 @@ async def pelunasan(
         
   except Exception as e:
     return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+
+@app.post('/saveterapis')
+async def postterapis(
+  request : Request
+) :
+  try:
+    pool = await get_db()
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        try:
+          # 1. Start Transaction
+          await conn.begin()
+
+          # 2. Execute querynya
+          data = await request.json()
+
+          if data['idterapis2'] != 'noterapis':
+            q1 = "INSERT INTO detail_terapis_transaksi(id_transaksi,id_terapis) VALUES(%s, %s)"
+            await cursor.execute(q1, (data['id_transaksi'], data['idterapis2']))
+
+            q3 = """
+            UPDATE karyawan SET is_occupied = %s
+            WHERE id_karyawan = %s 
+            """
+            await cursor.execute(q3, (1,data['idterapis2']))
+          
+          if data['idterapis3'] != 'noterapis':
+            q2 = "INSERT INTO detail_terapis_transaksi(id_transaksi,id_terapis)VALUES(%s, %s)"
+            await cursor.execute(q2, (data['id_transaksi'], data['idterapis3']))
+            q4 = """
+            UPDATE karyawan SET is_occupied = %s
+            WHERE id_karyawan = %s 
+            """
+            await cursor.execute(q4, (1,data['idterapis3']))
+
+          # 3. Klo Sukses, dia bkl save ke db
+          await conn.commit()
+
+          return "Succes"
+        except aiomysqlerror as e:
+          # Rollback Input Jika Error
+
+          # Ambil Error code
+          error_code = e.args[0] if e.args else "Unknown"
+          
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+        
+        except Exception as e:
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
