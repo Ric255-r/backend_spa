@@ -357,8 +357,10 @@ async def exportExcel(
             tgl = formatStrDate(fetched_tgl[0])
 
           q1 = f"""
-            SELECT mt.id_transaksi, mt.created_at AS tgl_beli, mt.jenis_transaksi, r.nama_ruangan AS kamar, k_terapis.nama_karyawan AS terapis,
-            mt.total_harga, mt.disc, mt.grand_total, (mt.gtotal_stlh_pajak - mt.grand_total) AS pembulatan, mt.gtotal_stlh_pajak AS bayar
+            SELECT mt.id_transaksi, mt.created_at AS tgl_beli, mt.jenis_transaksi, r.nama_ruangan AS kamar, 
+            k_terapis.nama_karyawan AS terapis, CASE WHEN mt.jenis_pembayaran = 0 THEN 'pembayaran diawal' 
+            ELSE 'pembayaran diakhir' END AS tipe_pembayaran,
+            mt.total_harga, mt.disc, mt.grand_total, mt.gtotal_stlh_pajak AS bayar
             FROM main_transaksi mt
             LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan
             -- JOIN tabel yang sama
