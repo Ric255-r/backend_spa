@@ -357,7 +357,7 @@ async def exportExcel(
             tgl = formatStrDate(fetched_tgl[0])
 
           q1 = f"""
-            SELECT mt.id_transaksi, mt.created_at AS tgl_beli, mt.jenis_transaksi, r.nama_ruangan AS kamar, 
+            SELECT ROW_NUMBER() OVER (ORDER BY mt.created_at) as no,mt.id_transaksi, mt.created_at AS tgl_beli, mt.jenis_transaksi, r.nama_ruangan AS kamar, 
             k_terapis.nama_karyawan AS terapis, CASE WHEN mt.jenis_pembayaran = 0 THEN 'pembayaran diawal' 
             ELSE 'pembayaran diakhir' END AS tipe_pembayaran,
             CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 0 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_paket dtp WHERE dtp.id_transaksi = mt. id_transaksi) AS INTEGER) + 
@@ -385,8 +385,22 @@ async def exportExcel(
             r.nama_ruangan, k_terapis.nama_karyawan, mt.jenis_pembayaran,
             mt.total_harga, mt.disc, mt.grand_total, mt.gtotal_stlh_pajak
           """
+          
           await cursor.execute(q1, params)
           main_data = await cursor.fetchall()
+
+          qdetail = """
+            SELECT dtp.id_transaksi, pm.nama_paket_msg as nama_item, dtp.qty FROM detail_transaksi_paket dtp INNER JOIN paket_massage pm ON dtp.id_paket = pm.id_paket_msg
+            UNION ALL
+            SELECT dtp.id_transaksi, pe.nama_paket_extend as nama_item, dtp.qty FROM detail_transaksi_paket dtp INNER JOIN paket_extend pe ON dtp.id_paket = pe.id_paket_extend
+            UNION ALL
+            SELECT dtpr.id_transaksi, mp.nama_produk as nama_item, dtpr.qty FROM detail_transaksi_produk dtpr INNER JOIN menu_produk mp ON dtpr.id_produk = mp.id_produk
+            UNION ALL
+            SELECT dtpf.id_transaksi, mf.nama_fnb as nama_item, dtpf.qty FROM detail_transaksi_fnb dtpf INNER JOIN menu_fnb mf ON dtpf.id_fnb = mf.id_fnb
+          """
+
+          await cursor.execute(qdetail)
+          detail_data = await cursor.fetchall()
 
           # Step 2, buat Workbook Excel. wb = WorkBook, ws = WorkSheet
           wb = Workbook()
@@ -395,7 +409,7 @@ async def exportExcel(
 
           # Step 3, Tambahkan Header kaya Judul lalu di Merge
           corporate_name = "PLATINUM"
-          ws.merge_cells('A1:I1') # Merge A1 smpe I1
+          ws.merge_cells('A1:M1') # Merge A1 smpe I1
           corp_cell = ws['A1']
           corp_cell.value = corporate_name
 
@@ -407,7 +421,7 @@ async def exportExcel(
 
           # Step 5, Tambah Keterangan dibawah nama korporat yg diheader A1
           corporate_ket = f"LAPORAN PENJUALAN PERIODE {tgl}"
-          ws.merge_cells('A2:I2')
+          ws.merge_cells('A2:M2')
           ket_cell = ws['A2']
           ket_cell.value = corporate_ket
 
@@ -450,9 +464,10 @@ async def exportExcel(
             )
 
           # Step 8 : Tambah data ke ws. jadikan list dlu, br ambil values
-          for row in main_data:
+          for trx in main_data:
+            trx_id = trx['id_transaksi']
             row_as_str = []
-            for value in row.values():
+            for value in trx.values():
               if isinstance(value, datetime):
                 value = value.strftime('%d-%m-%Y\n%H:%M:%S')
               elif isinstance(value, int):
@@ -471,6 +486,18 @@ async def exportExcel(
               row_as_str.append(value)
             print(row_as_str)
             ws.append(row_as_str)
+
+            ws.append([""] * (len(row_as_str)-12) + ["Detail Paket","Nama Item", "Qty"])
+
+            current_row = ws.max_row
+            start_col = len(row_as_str) - 12 + 1
+
+            for col in range(start_col, start_col + 3):
+              ws.cell(row=current_row, column=col).font = Font(bold=True)
+
+            details = [d for d in detail_data if d['id_transaksi'] == trx_id]
+            for d in details:
+              ws.append([""] * (len(row_as_str)-11) + [d["nama_item"], str(d["qty"])])
 
             # Step 8.5: Tambahkan border ke setiap row
             thin_border = Border(
@@ -541,8 +568,10 @@ async def exportExcel(
           ws.append([])
 
           # Add the summary row. adjust yang len(column_main) - 3. klo mw perkecil, besarin  valuenya
+
           summary_label = "TOTAL"
-          ws.append([summary_label] + [""] * (len(column_main) - 3) + ["", sum(row['bayar'] for row in main_data)])
+          total_bayar = sum(row.get('bayar',0)or 0 for row in main_data)
+          ws.append([summary_label] + [""] * (len(column_main) - 3) + ["", total_bayar])
 
           # Style the summary row
           summary_row = ws[ws.max_row]  # Get the last row

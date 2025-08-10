@@ -221,13 +221,13 @@ async def storeData(
               q3 = """
                 UPDATE main_transaksi
                 SET
-                  jenis_transaksi = %s, id_member = %s, total_harga = %s, disc = %s, 
+                  jenis_transaksi = %s, id_member = %s, total_harga = %s, disc = %s, harga_vip = %s,
                   grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, metode_pembayaran = %s, nama_akun = %s, no_rek = %s, 
                   nama_bank = %s, jumlah_bayar = %s, jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'massage', data['id_member'], data['total_harga'], data['disc'], 
+                'massage', data['id_member'], data['total_harga'], data['disc'], data['harga_vip'],
                 data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'], data['metode_pembayaran'], data['nama_akun'], data['no_rek'],  
                 data['nama_bank'], data['jumlah_bayar'], 0, jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -237,13 +237,13 @@ async def storeData(
               q3 = """
                 UPDATE main_transaksi
                 SET
-                  jenis_transaksi = %s, id_member = %s, total_harga = %s, disc = %s, 
+                  jenis_transaksi = %s, id_member = %s, total_harga = %s, disc = %s, harga_vip = %s, 
                   grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, metode_pembayaran = %s, jumlah_bayar = %s, 
                   jumlah_kembalian = %s, jenis_pembayaran = %s, status = %s
                 WHERE id_transaksi = %s
               """
               await cursor.execute(q3, (
-                'massage', data['id_member'], data['total_harga'], data['disc'], 
+                'massage', data['id_member'], data['total_harga'], data['disc'], data['harga_vip'],
                 data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'], data['metode_pembayaran'], data['jumlah_bayar'], 
                 data['jumlah_bayar'] - data['gtotal_stlh_pajak'], jenis_pembayaran, status_trans,
                 data['id_transaksi']  # <- moved to last parameter because it's in WHERE
@@ -272,13 +272,13 @@ async def storeData(
             q3 = """
               UPDATE main_transaksi
               SET
-                jenis_transaksi = %s, total_harga = %s, disc = %s, 
+                jenis_transaksi = %s, total_harga = %s, disc = %s, harga_vip = %s, 
                 grand_total = %s, pajak = %s, gtotal_stlh_pajak = %s, metode_pembayaran = %s, jumlah_bayar = %s, jumlah_kembalian = %s, 
                 jenis_pembayaran = %s, status = %s
               WHERE id_transaksi = %s
             """
             await cursor.execute(q3, (
-              'massage', data['total_harga'], data['disc'], 
+              'massage', data['total_harga'], data['disc'], data['harga_vip'],
               data['grand_total'], data['pajak'], data['gtotal_stlh_pajak'], "-", 0, 0, jenis_pembayaran,  status_trans,
               data['id_transaksi']  # <- moved to last parameter because it's in WHERE
             ))

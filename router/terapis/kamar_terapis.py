@@ -21,11 +21,11 @@ import logging
 
 # Buat File Logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 # Buat Nama Handler
 file_handler = logging.FileHandler("anomali_log.txt")
-file_handler.setLevel(logging.WARNING) # Only log WARNING and higher to the file
+file_handler.setLevel(logging.INFO) # Only log WARNING and higher to the file
 
 # Buat Formatter lalu tambah ke file handler
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
