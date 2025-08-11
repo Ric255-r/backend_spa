@@ -21,11 +21,11 @@ import logging
 
 # Buat File Logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 # Buat Nama Handler
 file_handler = logging.FileHandler("anomali_log.txt")
-file_handler.setLevel(logging.WARNING) # Only log WARNING and higher to the file
+file_handler.setLevel(logging.INFO) # Only log WARNING and higher to the file
 
 # Buat Formatter lalu tambah ke file handler
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -1076,3 +1076,58 @@ async def panggilob(
         return {"status" : "Panggil OB jalan"}
   except HTTPException as e:
     return JSONResponse({"Error panggil OB": str(e)}, status_code=e.status_code)
+  
+
+@app.get('/dataterapistambahan')
+async def getdataterapistambahan(
+  request : Request
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        data = await request.json()
+
+        q1 = "SELECT k.nama_karyawan from karyawan k inner join detail_terapis_transaksi dtt on k.id_karyawan = dtt.id_terapis WHERE dtt.id_transaksi = %s"
+          
+        await cursor.execute(q1, (data['id_transaksi']))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data User": str(e)}, status_code=500)
+
+@app.put('/setstatusterapistambahan')
+async def setstatusterapistambaahan(
+  request : Request
+) :
+  try :
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        data = await request.json()
+
+        q1 = "UPDATE karyawan SET is_occupied = 0 WHERE nama_karyawan = %s"
+        await cursor.execute(q1, (data['namaterapis2']))
+
+        q2 = "UPDATE karyawan SET is_occupied = 0 WHERE nama_karyawan = %s"
+        await cursor.execute(q2, (data['namaterapis3']))
+
+        await conn.commit() 
+  except HTTPException as e:
+    return JSONResponse({"Error Set Status Terapis": str(e)}, status_code=e.status_code)
+
+
