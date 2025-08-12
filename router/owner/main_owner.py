@@ -571,7 +571,14 @@ async def exportExcel(
 
           summary_label = "TOTAL"
           total_bayar = sum(row.get('bayar',0)or 0 for row in main_data)
-          ws.append([summary_label] + [""] * (len(column_main) - 3) + ["", total_bayar])
+          ws.append([summary_label] + [""] * (len(column_main) - 4) + ["", total_bayar])
+
+          total_row_index = ws.max_row
+          total_col_index = len(column_main)
+          col_letter = get_column_letter(total_col_index)
+
+          ws.merge_cells(f"{get_column_letter(total_col_index - 1)}{total_row_index}:{col_letter}{total_row_index}")
+
 
           # Style the summary row
           summary_row = ws[ws.max_row]  # Get the last row
@@ -586,7 +593,7 @@ async def exportExcel(
             )
 
           # Make the total value right-aligned and formatted with thousands separator
-          total_cell = ws.cell(row=ws.max_row, column=len(column_main))
+          total_cell = ws.cell(row=total_row_index, column=total_col_index - 1)
           total_cell.alignment = Alignment(horizontal="right")
           total_cell.number_format = '#,##0'
 
