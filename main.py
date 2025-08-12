@@ -70,7 +70,7 @@ app.mount("/qrcodes", StaticFiles(directory="qrcodes"), name="qrcodes")
 # IP FILTERING CODE UTK KEAMANAN
 # LOCALHOST ORIGINAL
 ALLOWED_IPS = [
-  "127.0.0.1","192.168.7.180", "192.168.100.9", "192.168.31.184", "172.16.28.35"
+  "127.0.0.1","192.168.7.180", "192.168.100.9", "192.168.50.163"
 ]
 
 # Ijinkan IP Tailscale
