@@ -179,5 +179,5 @@ app.include_router(main_router, prefix="/api")
 if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
-  # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="172.16.28.35", port=5500)
+  # uvicorn main:app --reload --host 192.168.100.11 --port 550192.168.1.9
+  uvicorn.run(app, host="0.0.0.0", port=5500)
