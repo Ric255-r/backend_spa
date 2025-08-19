@@ -834,6 +834,7 @@ async def selesai(
           qSelect = f"""
             SELECT id_ruangan, id_terapis, no_loker, total_addon, status FROM main_transaksi 
             WHERE id_transaksi = %s
+            FOR UPDATE
           """
           await cursor.execute(qSelect, (data['id_transaksi'], ))
           items = await cursor.fetchone()
@@ -844,30 +845,40 @@ async def selesai(
           total_addon = items[3]
           status = items[4]
 
-          mode = ""
-          if total_addon == 0 and status == 'paid':
-            mode = 'done'
-          elif total_addon != 0 and status == 'paid':
-            mode = 'done-unpaid-addon'
-          elif total_addon != 0 and status == 'unpaid': 
-            mode = 'done-unpaid'
-          elif total_addon == 0 and status == 'unpaid':
-            mode = 'done-unpaid'
-          else:
-            if status in ["done", "done-unpaid", "done-unpaid-addon"]:
-              mode = status
-            else:
-              log_message = (
-                f"INFO: Id Transaction '{data['id_transaksi']}' already in a final state "
-                f"Status di main_transaksi '{status}' (total_addon: {total_addon}). "
-                f"Variabel Mode ada di {mode}"
-              )
-              logger.info(log_message)
+          # mode = ""
+          # if total_addon == 0 and status == 'paid':
+          #   mode = 'done'
+          # elif total_addon != 0 and status == 'paid':
+          #   mode = 'done-unpaid-addon'
+          # elif total_addon != 0 and status == 'unpaid': 
+          #   mode = 'done-unpaid'
+          # elif total_addon == 0 and status == 'unpaid':
+          #   mode = 'done-unpaid'
+          # else:
+          #   if status in ["done", "done-unpaid", "done-unpaid-addon"]:
+          #     mode = status
+          #   else:
+          #     log_message = (
+          #       f"INFO: Id Transaction '{data['id_transaksi']}' already in a final state "
+          #       f"Status di main_transaksi '{status}' (total_addon: {total_addon}). "
+          #       f"Variabel Mode ada di {mode}"
+          #     )
+          #     logger.info(log_message)
           
-          print("Mode Pas Selesai Kamar", mode)
+          # print("Mode Pas Selesai Kamar", mode)
+          # q1 = f"""
+          #   UPDATE main_transaksi SET sedang_dikerjakan = FALSE,
+          #   status = '{mode}' WHERE id_transaksi = %s
+          # """
           q1 = f"""
             UPDATE main_transaksi SET sedang_dikerjakan = FALSE,
-            status = '{mode}' WHERE id_transaksi = %s
+            status = CASE
+              WHEN total_addon = 0 AND status = 'paid' THEN 'done'
+              WHEN total_addon > 0 AND status = 'paid' THEN 'done-unpaid-addon'
+              WHEN total_addon >= 0 AND status = 'unpaid' THEN 'done-unpaid'
+              ELSE status
+            END
+              WHERE id_transaksi = %s
           """
           await cursor.execute(q1, (data['id_transaksi'], ))
 
@@ -883,7 +894,7 @@ async def selesai(
 
           q4 = f"""
             UPDATE terapis_kerja SET jam_selesai = NOW() 
-            {', alasan = %s' if selesai_awal is not None else ''}
+            {', alasan = %s' if selesai_awal is not None else ""}
             WHERE id_transaksi = %s and id_terapis = %s
           """
           if selesai_awal is not None:
@@ -895,7 +906,7 @@ async def selesai(
           await cursor.execute(q5, (data['id_transaksi'], ))
 
           q6 = "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = %s"
-          await cursor.execute(q6, id_ruangan)
+          await cursor.execute(q6, (id_ruangan, ))
 
           item6 = await cursor.fetchone()
 
