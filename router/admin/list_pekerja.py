@@ -296,31 +296,47 @@ async def getDataGro():
 
 @app.post("/update_occupied")
 async def update_occupied(request: Request):
-    try:
-        data = await request.json()
-        print("Data diterima:", data)
+  try:
+    data = await request.json()
+    print("Data diterima:", data)
 
-        id_karyawan = data.get("id_karyawan")
-        is_occupied = data.get("is_occupied")
+    id_karyawan = data.get("id_karyawan")
+    is_occupied = data.get("is_occupied")
 
-        if id_karyawan is None:
-            raise HTTPException(status_code=400, detail="Missing id_karyawan")
+    if id_karyawan is None:
+        raise HTTPException(status_code=400, detail="Missing id_karyawan")
 
-        if is_occupied is None:
-            raise HTTPException(status_code=400, detail="Missing is_occupied")
+    if is_occupied is None:
+        raise HTTPException(status_code=400, detail="Missing is_occupied")
 
-        pool = await get_db()
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cursor:
-                query = "UPDATE karyawan SET is_occupied = %s WHERE id_karyawan = %s"
-                print("Executing query:", query, (is_occupied, id_karyawan))
-                
-                await cursor.execute(query, (is_occupied, id_karyawan))
-                await conn.commit()
+    pool = await get_db()
+    async with pool.acquire() as conn:
+      async with conn.cursor() as cursor:
+        await conn.begin()
 
-        return {"message": "Berhasil update is_occupied"}
+        query = "UPDATE karyawan SET is_occupied = %s WHERE id_karyawan = %s"
+        print("Executing query:", query, (is_occupied, id_karyawan))
+        await cursor.execute(query, (is_occupied, id_karyawan))
 
-    except Exception as e:
-        print("Exception occurred:", str(e))
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        query2 = "SELECT * FROM main_transaksi WHERE id_karyawan = %s ORDER BY created_at DESC LIMIT 1"
+        await cursor.execute(query2, (id_karyawan, ))
+        item2 = await cursor.fetchone()
+
+        query3 = "DELETE FROM durasi_kerja_sementara WHERE id_transaksi = %s"
+        await cursor.execute(query3, (item2['id_transaksi'], ))
+        await conn.commit()
+
+      return {"message": "Berhasil update is_occupied"}
+  
+  except HTTPException as e:
+    await conn.rollback()
+    return JSONResponse(content={"Status": f"Error {str(e)}"}, status_code=e.status_code)
+
+  except aiomysqlerror as e:
+    await conn.rollback()
+    return JSONResponse(content={"status": "error", "message": f"Database Error {str(e)}"}, status_code=500)
+  
+  except Exception as e:
+    print("Exception occurred:", str(e))
+    traceback.print_exc()
+    raise HTTPException(status_code=500, detail="Internal Server Error")

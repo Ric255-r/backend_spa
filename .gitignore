@@ -5,4 +5,4 @@ testadminbushub.py
 main.py
 build
 dist
-utils/restart_pc.py
+router/utils/restart_pc.py

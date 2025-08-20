@@ -52,7 +52,7 @@ from router.resepsionis.history_member import app as app_historymember
 from router.komisi.komisi import app as app_komisi
 from router.admin.pajak import app as app_pajak
 from router.admin.daftarpaketextend import app as app_daftarpaketextend
-from utils.restart_pc import app as app_restart
+from router.utils.restart_pc import app as app_restart_pc
 from jwt_auth import access_security
 
 from koneksi import lifespan
@@ -170,7 +170,7 @@ main_router.include_router(app_historymember)
 main_router.include_router(app_komisi)
 main_router.include_router(app_pajak)
 main_router.include_router(app_daftarpaketextend)
-main_router.include_router(app_restart)
+main_router.include_router(app_restart_pc)
 # main_router.include_router(app_transaction)
 # main_router.include_router(app_admin)
 
@@ -183,4 +183,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 550192.168.1.9
-  uvicorn.run(app, host="192.168.1.11", port=5500)
+  uvicorn.run(app, host="100.90.36.28", port=5500)
