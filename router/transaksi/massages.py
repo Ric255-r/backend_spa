@@ -344,6 +344,7 @@ async def pelunasan(
           q1 = """
             SELECT grand_total, gtotal_stlh_pajak, total_addon, jumlah_bayar, jumlah_kembalian, pajak FROM main_transaksi
             WHERE id_transaksi = %s
+            FOR UPDATE
           """
           await cursor.execute(q1, (id_trans, ))
 
@@ -429,7 +430,7 @@ async def pelunasan(
           else:
             q2 = """
               UPDATE main_transaksi SET grand_total = %s, gtotal_stlh_pajak = %s, total_addon = %s, 
-              jumlah_bayar = %s, jumlah_kembalian = 0,
+              jumlah_bayar = %s, jumlah_kembalian = 0, updated_at = CURRENT_TIMESTAMP(),
               status = %s WHERE id_transaksi = %s
             """
             await cursor.execute(q2, (main_grand_total + total_addon, gtotal_stlh_pajak + total_addon_after_tax, 0, sum_jlh_byr, 'done', id_trans))
