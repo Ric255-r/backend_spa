@@ -872,6 +872,7 @@ async def selesai(
           # """
           q1 = f"""
             UPDATE main_transaksi SET sedang_dikerjakan = FALSE,
+            updated_at = CURRENT_TIMESTAMP(),
             status = CASE
               WHEN total_addon = 0 AND status = 'paid' THEN 'done'
               WHEN total_addon > 0 AND status = 'paid' THEN 'done-unpaid-addon'
