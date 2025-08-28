@@ -577,8 +577,14 @@ async def update_mulai(
             """
             await cursor.execute(qUpdateMulai, (jam_mulai, data['id_transaksi'], data['id_terapis']))
 
-
-          q2 = "UPDATE main_transaksi SET sedang_dikerjakan = 1 WHERE id_transaksi = %s"
+          q2 = """
+            UPDATE main_transaksi SET sedang_dikerjakan = 1,
+            status = CASE
+              WHEN jenis_pembayaran = 0 THEN 'paid'
+              WHEN jenis_pembayaran = 1 THEN 'unpaid'
+            END 
+            WHERE id_transaksi = %s
+          """
           await cursor.execute(q2, (data['id_transaksi'], ))
 
           qCheck = """
