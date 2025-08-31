@@ -32,8 +32,8 @@ async def postRoom(
 
           # 2. Execute querynya
           data = await request.json()
-          q1 = "INSERT INTO ruangan (nama_ruangan, id_karyawan, lantai, jenis_ruangan, status) VALUES(%s, %s, %s, %s, %s)"
-          await cursor.execute(q1, (data['nama_ruangan'], data['kode_ruangan'],data['lantai'], data['jenis_ruangan'], data['status'])) 
+          q1 = "INSERT INTO ruangan (nama_ruangan, id_karyawan, lantai, jenis_ruangan, harga_ruangan, status) VALUES(%s, %s, %s, %s, %s,%s)"
+          await cursor.execute(q1, (data['nama_ruangan'], data['kode_ruangan'],data['lantai'], data['jenis_ruangan'], data['harga_ruangan'],  data['status'])) 
           q2 = "INSERT INTO users (id_karyawan, passwd, hak_akses) VALUES(%s, %s, %s)"
           await cursor.execute(q2, (data['kode_ruangan'], data['passwd'], '7'))
 

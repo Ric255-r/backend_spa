@@ -1147,5 +1147,34 @@ async def setstatusterapistambaahan(
         await conn.commit() 
   except HTTPException as e:
     return JSONResponse({"Error Set Status Terapis": str(e)}, status_code=e.status_code)
+  
+@app.get('/getidterapistambahan')
+async def getidterapistambahan(
+  request : Request
+):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        data = await request.json()
+
+        q1 = "SELECT id_karyawan from karyawan where nama_karyawan = %s"
+          
+        await cursor.execute(q1, (data['nama_karyawan']))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data User": str(e)}, status_code=500)
 
 

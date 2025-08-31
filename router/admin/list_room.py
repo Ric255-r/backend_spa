@@ -62,8 +62,8 @@ async def putRuangan(
               await conn.rollback()
               return JSONResponse(content={"status": "Error", "message": "Id Ruangan not found"}, status_code=404)
           
-          q1 = "UPDATE ruangan SET nama_ruangan = %s, lantai = %s, jenis_ruangan = %s, status = %s WHERE id_ruangan = %s"
-          await cursor.execute(q1, (data['nama_ruangan'], data['lantai'], data['jenis_ruangan'], data['status'], id_ruangan)) 
+          q1 = "UPDATE ruangan SET nama_ruangan = %s, lantai = %s, jenis_ruangan = %s, status = %s, harga_ruangan = %s WHERE id_ruangan = %s"
+          await cursor.execute(q1, (data['nama_ruangan'], data['lantai'], data['jenis_ruangan'], data['status'], data['harga_ruangan'], id_ruangan)) 
           # 3. Klo Sukses, dia bkl save ke db
           await conn.commit()
 

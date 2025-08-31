@@ -263,3 +263,4 @@ async def getlistkomisi(request : Request):
 
   except Exception as e:
     return JSONResponse({"Error Get Data Komisi": str(e)}, status_code=500)
+  

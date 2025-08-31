@@ -71,54 +71,21 @@ async def updatelocker(
   except Exception as e:
     return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)
 
-@app.get('/getstatus')
-async def getstatus(
-    request : Request
-) :
-  try :
-    pool = await get_db()
-
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
-        # await cursor.execute("COMMIT;")
-
-        data = await request.json()
-        q1 = "SELECT jenis_ruangan FROM ruangan where nama_ruangan = %s "
-
-        await cursor.execute(q1, (data['nama_ruangan'],))  
-
-        status = await cursor.fetchall()
-
-        jenis_ruangan = status[0][0] if status else None
-
-        print('status')
-
-        if jenis_ruangan == "VIP" :
-          q2 = "SELECT harga_vip FROM harga_vip"
-
-          await cursor.execute(q2)
-          hargavip = await cursor.fetchall()
-
-        else :
-          hargavip = [(0,)]
-
-      df = pd.DataFrame(hargavip, columns=["hargavip"])
-      return df.to_dict('records')
-
-  except HTTPException as e:
-   return JSONResponse({"Error": str(e)}, status_code=e.status_code)
-
 @app.get('/datahargavip')
-async def getDataHargaVip():
+async def getDataHargaVip(
+  request: Request
+):
   try:
     pool = await get_db() # Get The pool
 
     async with pool.acquire() as conn:  # Auto Release
       async with conn.cursor() as cursor:
         await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
-        q1 = "SELECT harga_vip FROM harga_vip"
-        await cursor.execute(q1)
+
+        data = await request.json()
+
+        q1 = "SELECT harga_ruangan FROM ruangan WHERE nama_ruangan = %s"
+        await cursor.execute(q1, (data['nama_ruangan'],))
 
         items = await cursor.fetchall()
 
@@ -131,41 +98,3 @@ async def getDataHargaVip():
 
   except Exception as e:
     return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
-  
-@app.put('/updatehargavip')
-async def updatehargavip(
-  request: Request
-):
-  try:
-    pool = await get_db()
-
-    async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
-        try:
-          # 1. Start Transaction
-          await conn.begin()
-
-          # 2. Execute querynya
-          data = await request.json()
-          q1 = "UPDATE harga_vip SET harga_vip = %s WHERE id = 1"
-          await cursor.execute(q1, (data['harga_baru_vip']))
-          # 3. Klo Sukses, dia bkl save ke db
-          await conn.commit()
-
-          return "succes"
-        except aiomysqlerror.MySQLError as e:
-          # Rollback Input Jika Error
-
-          # Ambil Error code
-          error_code = e.args[0] if e.args else "Unknown"
-          
-          await conn.rollback()
-          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
-        
-        except Exception as e:
-          await conn.rollback()
-          print(f"Error during insert : {e}")
-          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
-        
-  except Exception as e:
-    return JSONResponse(content={"status": "Error", "message": f"Koneksi Error {str(e)}"}, status_code=500)

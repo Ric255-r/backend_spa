@@ -311,3 +311,29 @@ async def getqtyproduk(
 
   except Exception as e:
     return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)
+  
+@app.get('/getdataterapistambahan')
+async def getdataterapistambahan(request : Request):
+  try:
+    pool = await get_db() # Get The pool
+
+    async with pool.acquire() as conn:  # Auto Release
+      async with conn.cursor() as cursor:
+        await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;")
+
+        data = await request.json()
+
+        q1 = "SELECT * FROM detail_terapis_transaksi WHERE id_transaksi = %s"
+        await cursor.execute(q1, (data['id_transaksi']))
+
+        items = await cursor.fetchall()
+
+        column_name = []
+        for kol in cursor.description:
+          column_name.append(kol[0])
+
+        df = pd.DataFrame(items, columns=column_name)
+        return df.to_dict('records')
+
+  except Exception as e:
+    return JSONResponse({"Error Get Data Ruangan": str(e)}, status_code=500)

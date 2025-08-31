@@ -737,20 +737,44 @@ async def export_excel_komisi_bulanan(
           q1 = """
 
             SELECT mt.id_transaksi, mt.created_at, dtp.id_paket as id_paket, pm.nama_paket_msg as nama_paket, pm.harga_paket_msg as harga_paket, dtp.qty, IF(LENGTH(CAST(pm.nominal_komisi as CHAR)) <=3, pm.nominal_komisi/100 * pm.harga_paket_msg * dtp.qty, pm.nominal_komisi * dtp.qty) AS komisi , k.nama_karyawan 
-            FROM main_transaksi as mt inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
-            inner join paket_massage as pm on dtp.id_paket = pm.id_paket_msg inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mt.status = 'done'
+            FROM main_transaksi as mt 
+            inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
+            inner join paket_massage as pm on dtp.id_paket = pm.id_paket_msg 
+            join (
+              SELECT id_transaksi, id_terapis FROM main_transaksi WHERE status = 'done'
+              UNION ALL
+              SELECT id_transaksi, id_terapis FROM detail_terapis_transaksi
+              ) all_terapis ON mt.id_transaksi = all_terapis.id_transaksi
+            inner join karyawan as k on all_terapis.id_terapis = k.id_karyawan 
+            WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mt.status = 'done'
 
             UNION ALL
 
             SELECT mt.id_transaksi, mt.created_at, dtpr.id_produk as id_paket, mp.nama_produk as nama_paket, mp.harga_produk as harga_paket, dtpr.qty, IF(LENGTH(CAST(mp.nominal_komisi as CHAR)) <=3, mp.nominal_komisi/100 * mp.harga_produk * dtpr.qty, mp.nominal_komisi * dtpr.qty) AS komisi , k.nama_karyawan 
-            FROM main_transaksi as mt inner join detail_transaksi_produk as dtpr on mt.id_transaksi = dtpr.id_transaksi 
-            inner join menu_produk as mp on dtpr.id_produk = mp.id_produk inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mp.nominal_komisi != 0 AND mt.status = 'done'
+            FROM main_transaksi as mt 
+            inner join detail_transaksi_produk as dtpr on mt.id_transaksi = dtpr.id_transaksi 
+            inner join menu_produk as mp on dtpr.id_produk = mp.id_produk 
+            join (
+              SELECT id_transaksi, id_terapis FROM main_transaksi WHERE status = 'done'
+              UNION ALL
+              SELECT id_transaksi, id_terapis FROM detail_terapis_transaksi
+              ) all_terapis ON mt.id_transaksi = all_terapis.id_transaksi
+            inner join karyawan as k on all_terapis.id_terapis = k.id_karyawan 
+            WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mp.nominal_komisi != 0 AND mt.status = 'done'
             
             UNION ALL
 
             SELECT mt.id_transaksi, mt.created_at, dtp.id_paket as id_paket, pe.nama_paket_extend as nama_paket, pe.harga_extend as harga_paket, dtp.qty, IF(LENGTH(CAST(pe.nominal_komisi as CHAR)) <=3, pe.nominal_komisi/100 * pe.harga_extend * dtp.qty , pe.nominal_komisi * dtp.qty ) AS komisi , k.nama_karyawan 
-            FROM main_transaksi as mt inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
-            inner join paket_extend as pe on dtp.id_paket = pe.id_paket_extend inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mt.status = 'done'
+            FROM main_transaksi as mt 
+            inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
+            inner join paket_extend as pe on dtp.id_paket = pe.id_paket_extend 
+            join (
+              SELECT id_transaksi, id_terapis FROM main_transaksi WHERE status = 'done'
+              UNION ALL
+              SELECT id_transaksi, id_terapis FROM detail_terapis_transaksi
+              ) all_terapis ON mt.id_transaksi = all_terapis.id_transaksi
+            inner join karyawan as k on all_terapis.id_terapis = k.id_karyawan 
+            WHERE MONTH(mt.created_at) = %s and YEAR(mt.created_at) = %s AND mt.status = 'done'
 
             ORDER BY nama_karyawan, id_transaksi ASC
 
@@ -1341,20 +1365,44 @@ async def export_excel_komisi_harian(
           q1 = """
 
             SELECT mt.id_transaksi, mt.created_at, dtp.id_paket as id_paket, pm.nama_paket_msg as nama_paket, pm.harga_paket_msg as harga_paket, dtp.qty, IF(LENGTH(CAST(pm.nominal_komisi as CHAR)) <=3, pm.nominal_komisi/100 * pm.harga_paket_msg * dtp.qty, pm.nominal_komisi * dtp.qty) AS komisi , k.nama_karyawan 
-            FROM main_transaksi as mt inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
-            inner join paket_massage as pm on dtp.id_paket = pm.id_paket_msg inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE DATE(mt.created_at) BETWEEN %s AND %s AND mt.status = 'done'
+            FROM main_transaksi as mt 
+            inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
+            inner join paket_massage as pm on dtp.id_paket = pm.id_paket_msg 
+            join (
+              SELECT id_transaksi, id_terapis FROM main_transaksi WHERE status = 'done'
+              UNION ALL
+              SELECT id_transaksi, id_terapis FROM detail_terapis_transaksi
+              ) all_terapis ON mt.id_transaksi = all_terapis.id_transaksi
+            inner join karyawan as k on all_terapis.id_terapis = k.id_karyawan 
+            WHERE DATE(mt.created_at) BETWEEN %s AND %s AND mt.status = 'done'
 
             UNION ALL
 
             SELECT mt.id_transaksi, mt.created_at, dtpr.id_produk as id_paket, mp.nama_produk as nama_paket, mp.harga_produk as harga_paket, dtpr.qty, IF(LENGTH(CAST(mp.nominal_komisi as CHAR)) <=3, mp.nominal_komisi/100 * mp.harga_produk * dtpr.qty, mp.nominal_komisi * dtpr.qty) AS komisi , k.nama_karyawan 
-            FROM main_transaksi as mt inner join detail_transaksi_produk as dtpr on mt.id_transaksi = dtpr.id_transaksi 
-            inner join menu_produk as mp on dtpr.id_produk = mp.id_produk inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE DATE(mt.created_at) BETWEEN %s AND %s AND mp.nominal_komisi != 0 AND mt.status = 'done'
+            FROM main_transaksi as mt 
+            inner join detail_transaksi_produk as dtpr on mt.id_transaksi = dtpr.id_transaksi 
+            inner join menu_produk as mp on dtpr.id_produk = mp.id_produk 
+            join (
+              SELECT id_transaksi, id_terapis FROM main_transaksi WHERE status = 'done'
+              UNION ALL
+              SELECT id_transaksi, id_terapis FROM detail_terapis_transaksi
+              ) all_terapis ON mt.id_transaksi = all_terapis.id_transaksi
+            inner join karyawan as k on all_terapis.id_terapis = k.id_karyawan 
+            WHERE DATE(mt.created_at) BETWEEN %s AND %s AND mp.nominal_komisi != 0 AND mt.status = 'done'
             
             UNION ALL
 
             SELECT mt.id_transaksi, mt.created_at, dtp.id_paket as id_paket, pe.nama_paket_extend as nama_paket, pe.harga_extend as harga_paket, dtp.qty, IF(LENGTH(CAST(pe.nominal_komisi as CHAR)) <=3, pe.nominal_komisi/100 * pe.harga_extend * dtp.qty , pe.nominal_komisi * dtp.qty ) AS komisi , k.nama_karyawan 
-            FROM main_transaksi as mt inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
-            inner join paket_extend as pe on dtp.id_paket = pe.id_paket_extend inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE DATE(mt.created_at) BETWEEN %s AND %s AND mt.status = 'done'
+            FROM main_transaksi as mt 
+            inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
+            inner join paket_extend as pe on dtp.id_paket = pe.id_paket_extend 
+            join (
+              SELECT id_transaksi, id_terapis FROM main_transaksi WHERE status = 'done'
+              UNION ALL
+              SELECT id_transaksi, id_terapis FROM detail_terapis_transaksi
+              ) all_terapis ON mt.id_transaksi = all_terapis.id_transaksi
+            inner join karyawan as k on all_terapis.id_terapis = k.id_karyawan 
+            WHERE DATE(mt.created_at) BETWEEN %s AND %s AND mt.status = 'done'
 
             ORDER BY nama_karyawan, id_transaksi ASC
 
@@ -1944,20 +1992,44 @@ async def export_excel_komisi_tahunan(
           q1 = """
 
             SELECT mt.id_transaksi, mt.created_at, dtp.id_paket as id_paket, pm.nama_paket_msg as nama_paket, pm.harga_paket_msg as harga_paket, dtp.qty, IF(LENGTH(CAST(pm.nominal_komisi as CHAR)) <=3, pm.nominal_komisi/100 * pm.harga_paket_msg * dtp.qty, pm.nominal_komisi * dtp.qty) AS komisi , k.nama_karyawan 
-            FROM main_transaksi as mt inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
-            inner join paket_massage as pm on dtp.id_paket = pm.id_paket_msg inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE YEAR(mt.created_at) = %s AND mt.status = 'done'
+            FROM main_transaksi as mt 
+            inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
+            inner join paket_massage as pm on dtp.id_paket = pm.id_paket_msg 
+            join (
+              SELECT id_transaksi, id_terapis FROM main_transaksi WHERE status = 'done'
+              UNION ALL
+              SELECT id_transaksi, id_terapis FROM detail_terapis_transaksi
+              ) all_terapis ON mt.id_transaksi = all_terapis.id_transaksi
+            inner join karyawan as k on all_terapis.id_terapis = k.id_karyawan 
+            WHERE YEAR(mt.created_at) = %s AND mt.status = 'done'
 
             UNION ALL
 
             SELECT mt.id_transaksi, mt.created_at, dtpr.id_produk as id_paket, mp.nama_produk as nama_paket, mp.harga_produk as harga_paket, dtpr.qty, IF(LENGTH(CAST(mp.nominal_komisi as CHAR)) <=3, mp.nominal_komisi/100 * mp.harga_produk * dtpr.qty, mp.nominal_komisi * dtpr.qty) AS komisi , k.nama_karyawan 
-            FROM main_transaksi as mt inner join detail_transaksi_produk as dtpr on mt.id_transaksi = dtpr.id_transaksi 
-            inner join menu_produk as mp on dtpr.id_produk = mp.id_produk inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE YEAR(mt.created_at) = %s AND mp.nominal_komisi != 0 AND mt.status = 'done'
+            FROM main_transaksi as mt 
+            inner join detail_transaksi_produk as dtpr on mt.id_transaksi = dtpr.id_transaksi 
+            inner join menu_produk as mp on dtpr.id_produk = mp.id_produk 
+            join (
+              SELECT id_transaksi, id_terapis FROM main_transaksi WHERE status = 'done'
+              UNION ALL
+              SELECT id_transaksi, id_terapis FROM detail_terapis_transaksi
+              ) all_terapis ON mt.id_transaksi = all_terapis.id_transaksi
+            inner join karyawan as k on all_terapis.id_terapis = k.id_karyawan 
+            WHERE YEAR(mt.created_at) = %s AND mp.nominal_komisi != 0 AND mt.status = 'done'
             
             UNION ALL
 
             SELECT mt.id_transaksi, mt.created_at, dtp.id_paket as id_paket, pe.nama_paket_extend as nama_paket, pe.harga_extend as harga_paket, dtp.qty, IF(LENGTH(CAST(pe.nominal_komisi as CHAR)) <=3, pe.nominal_komisi/100 * pe.harga_extend * dtp.qty , pe.nominal_komisi * dtp.qty ) AS komisi , k.nama_karyawan 
-            FROM main_transaksi as mt inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
-            inner join paket_extend as pe on dtp.id_paket = pe.id_paket_extend inner join karyawan as k on mt.id_terapis = k.id_karyawan WHERE YEAR(mt.created_at) = %s AND mt.status = 'done'
+            FROM main_transaksi as mt 
+            inner join detail_transaksi_paket as dtp on mt.id_transaksi = dtp.id_transaksi 
+            inner join paket_extend as pe on dtp.id_paket = pe.id_paket_extend 
+            join (
+              SELECT id_transaksi, id_terapis FROM main_transaksi WHERE status = 'done'
+              UNION ALL
+              SELECT id_transaksi, id_terapis FROM detail_terapis_transaksi
+              ) all_terapis ON mt.id_transaksi = all_terapis.id_transaksi
+            inner join karyawan as k on all_terapis.id_terapis = k.id_karyawan 
+            WHERE YEAR(mt.created_at) = %s AND mt.status = 'done'
 
             ORDER BY nama_karyawan, id_transaksi ASC
 
