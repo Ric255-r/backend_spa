@@ -1,0 +1,15 @@
+fastapi
+fastapi_jwt
+uvicorn
+python-multipart
+aiomysql
+pandas
+openpyxl
+python-dateutil
+pywin32
+
+# Notes:
+# - `pywin32` provides both `win32com.client` and `pywintypes` for Windows COM automation.
+# - If you use a specific version of any package, specify it as `package==version`.
+# - If you use MySQL directly elsewhere, you may also need:
+# mysql-connector-python

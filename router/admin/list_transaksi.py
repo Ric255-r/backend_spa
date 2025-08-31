@@ -505,7 +505,7 @@ async def cancel_transaksi(
           await cursor.execute(qCheck, (data['passwd'], '5')) #Spv = 5
           isExists = await cursor.fetchone()
 
-          q_main = "SELECT * FROM main_transaksi WHERE id_transaksi = %s"
+          q_main = "SELECT * FROM main_transaksi WHERE id_transaksi = %s FOR UPDATE"
           await cursor.execute(q_main, (data['id_trans'], ))
           item_main = await cursor.fetchone()
 
@@ -544,6 +544,11 @@ async def cancel_transaksi(
               UPDATE data_loker SET status = 0 WHERE nomor_locker = %s
             """
             await cursor.execute(q5, (item_main['no_loker'], ))
+
+            q6 = """
+              DELETE FROM durasi_kerja_sementara WHERE id_transaksi = %s
+            """
+            await cursor.execute(q6, (data['id_trans'], ))
               
             await conn.commit()
 

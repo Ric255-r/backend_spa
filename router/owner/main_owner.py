@@ -18,11 +18,131 @@ from aiomysql import Error as aiomysqlerror
 import asyncio
 import win32com.client
 from pywintypes import com_error
+from datetime import datetime
 
 app = APIRouter(prefix=("/main_owner"))
 
+@app.get('/line_chart')
+async def getLineChart(
+  start_date: Optional[str] = Query(None),
+  end_date: Optional[str] = Query(None),
+):
+  params = []
+  kondisi_where = ""
+
+  # Tentukan tahun dan siapkan parameter awal
+  if start_date:
+    tahun = start_date.split("-")[0]
+  else:
+    tahun = datetime.now().year
+  
+  # Tahun digunakan dua kali dalam query, jadi tambahkan dua kali ke parameter
+  params.extend([tahun, tahun])
+
+  # Jika ada rentang tanggal, buat klausa WHERE dan tambahkan ke parameter
+  if start_date and end_date:
+    kondisi_where = "WHERE bulan BETWEEN %s AND %s"
+    params.extend([start_date, end_date])
+    
+  print("Isi Tahun ", tahun)
+
+  try:
+    pool = await get_db()
+
+    async with pool.acquire() as conn:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
+        try:
+          """
+            Fungsi Query1 Ini : (Utk Line Chart)
+            1. Filters records where created_at is from the first day of the current month
+            2. Up to (but not including) the first day of the month 12 months from now
+            3. Groups by year-month
+            4. Orders chronologically
+            5. Limits to 12 months of results
+          """
+          # q1 = """
+          #   WITH RECURSIVE months AS (
+          #     SELECT DATE_FORMAT(DATE_SUB(CURRENT_DATE, INTERVAL 11 MONTH), '%Y-%m') AS bulan,
+          #     1 AS num
+          #     UNION ALL
+          #     SELECT DATE_FORMAT(DATE_ADD(DATE_SUB(CURRENT_DATE, INTERVAL 11 MONTH), INTERVAL num MONTH), '%Y-%m'), num + 1
+          #     FROM months 
+          #     WHERE num < 12
+          #   )
+          #   SELECT m.bulan, IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_jual
+          #   FROM months m 
+          #   LEFT JOIN main_transaksi t 
+          #   ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('done', 'paid') AND t.is_cancel = 0
+          #   GROUP BY m.bulan
+          #   ORDER BY m.bulan
+          # """
+          q1 = f"""
+            WITH RECURSIVE all_months AS (
+                -- 1. Anchor: Mulai dari bulan pertama (Januari)
+                SELECT 1 AS month_num
+                UNION ALL
+                -- 2. Recursive: Tambahkan 1 bulan hingga mencapai 12 (Desember)
+                SELECT month_num + 1
+                FROM all_months
+                WHERE month_num < 12
+            ),
+            omset_per_bulan AS (
+              -- Bagian ini sama seperti query sebelumnya, menghasilkan data 1 tahun penuh
+              -- Gabungkan tahun yang diinginkan dengan nomor bulan untuk membuat format YYYY-MM
+
+              SELECT 
+                CONCAT(%s, '-', LPAD(m.month_num, 2, '0')) AS bulan, 
+                IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_jual
+              FROM 
+                all_months m
+              LEFT JOIN 
+                -- 3. Ganti tahun '2025' di sini sesuai kebutuhan Anda
+                main_transaksi t ON MONTH(t.created_at) = m.month_num
+                  AND YEAR(t.created_at) = %s -- Ganti tahun di sini jika perlu
+                  AND t.status IN ('done', 'paid') 
+                  AND t.is_cancel = 0
+              GROUP BY 
+                  m.month_num, bulan
+              ORDER BY 
+                  m.month_num
+            )
+            -- Filter hasil akhir sesuai rentang yang Anda inginkan
+            SELECT 
+                bulan, 
+                omset_jual
+            FROM 
+                omset_per_bulan
+            {kondisi_where}
+            ORDER BY 
+                bulan;
+          """
+          await cursor.execute(q1, params)  
+          items1 = await cursor.fetchall()
+
+          return {
+            "for_line_chart": items1
+          }
+        except aiomysqlerror as e:
+          # Rollback Input Jika Error
+
+          # Ambil Error code
+          error_code = e.args[0] if e.args else "Unknown"
+          
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Database Error{e} "}, status_code=500)
+        
+        except Exception as e:
+          await conn.rollback()
+          return JSONResponse(content={"status": "Error", "message": f"Server Error {e} "}, status_code=500)
+        
+  except Exception as e:
+    return JSONResponse(content={"status": "Errpr", "message": f"Koneksi Error {str(e)}"}, status_code=500)
+  
 @app.get('/get_laporan')
-async def getLaporan() :
+async def getLaporan(
+  tahun: Optional[str] = Query(None)
+) :
+
   try :
     pool = await get_db()
 
@@ -48,43 +168,6 @@ async def getLaporan() :
             "TF0002": { dan seterusnya},
           }
         """
-
-        """
-          Fungsi Query1 Ini : (Utk Line Chart)
-          1. Filters records where created_at is from the first day of the current month
-          2. Up to (but not including) the first day of the month 12 months from now
-          3. Groups by year-month
-          4. Orders chronologically
-          5. Limits to 12 months of results
-        """
-        # q1 = """
-
-        #   SELECT DATE_FORMAT(created_at, "%Y-%m") AS bulan,
-        #   SUM(gtotal_stlh_pajak) AS omset_jual
-        #   FROM main_transaksi
-        #   WHERE created_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') 
-        #   AND created_at < DATE_FORMAT(DATE_ADD(CURRENT_DATE, INTERVAL 12 MONTH), '%Y-%m-01')
-        #   GROUP BY bulan
-        #   LIMIT 12
-        # """
-        q1 = """
-          WITH RECURSIVE months AS (
-            SELECT DATE_FORMAT(DATE_SUB(CURRENT_DATE, INTERVAL 11 MONTH), '%Y-%m') AS bulan,
-            1 AS num
-            UNION ALL
-            SELECT DATE_FORMAT(DATE_ADD(DATE_SUB(CURRENT_DATE, INTERVAL 11 MONTH), INTERVAL num MONTH), '%Y-%m'), num + 1
-            FROM months 
-            WHERE num < 12
-          )
-          SELECT m.bulan, IFNULL(SUM(t.gtotal_stlh_pajak), 0) AS omset_jual
-          FROM months m 
-          LEFT JOIN main_transaksi t 
-          ON DATE_FORMAT(t.created_at, '%Y-%m') = m.bulan AND t.status IN ('done', 'paid') AND t.is_cancel = 0
-          GROUP BY m.bulan
-          ORDER BY m.bulan
-        """
-        await cursor.execute(q1)  
-        items1 = await cursor.fetchall()
 
         # Utk Perbandingan Current Month sama Sebelumnya. Total Penjualan (Paket Produk)
         queryWith = """
@@ -248,13 +331,20 @@ async def getLaporan() :
         """
         await cursor.execute(q5)
         items5 = await cursor.fetchall()
+
+        # Pilih Tahun Transaksi yang ada di main_transaksi
+        q6 = """
+          SELECT DISTINCT(YEAR(created_at)) AS tahun_transaksi FROM main_transaksi;
+        """
+        await cursor.execute(q6)
+        items6 = await cursor.fetchall()
         
         return {
-          "for_line_chart" : items1,
           "monthly_sales": items2,
           "sum_paket": items3,
           "sum_produk": df_produk.to_dict('records'),
-          "paket_terlaris": items5
+          "paket_terlaris": items5,
+          "tahun_transaksi": [data['tahun_transaksi'] for data in items6]
         }
 
   except HTTPException as e:
