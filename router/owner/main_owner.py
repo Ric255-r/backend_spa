@@ -456,14 +456,13 @@ async def exportExcel(
             ,
             CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_paket dtp WHERE dtp.id_transaksi = mt.id_transaksi) AS INTEGER) + 
             CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_produk dtpr WHERE dtpr.id_transaksi = mt.id_transaksi) AS INTEGER) +
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt.id_transaksi) AS INTEGER) AS Addon,
-            mt.harga_vip as harga_ruangan
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt.id_transaksi) AS INTEGER) AS Addon
             ,
             (mt.total_harga + 
             CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_paket dtp WHERE dtp.id_transaksi = mt.id_transaksi) AS INTEGER) + 
             CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_produk dtpr WHERE dtpr.id_transaksi = mt.id_transaksi) AS INTEGER) +
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt.id_transaksi) AS INTEGER)) as total_harga, 
-            mt.disc, mt.grand_total, mt.gtotal_stlh_pajak AS bayar
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt.id_transaksi) AS INTEGER)) as total_harga,
+            mt.disc,mt.harga_vip as harga_ruangan, mt.grand_total, mt.gtotal_stlh_pajak AS bayar
             FROM main_transaksi mt
             LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan
             LEFT JOIN (
