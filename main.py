@@ -71,7 +71,7 @@ app.mount("/qrcodes", StaticFiles(directory="qrcodes"), name="qrcodes")
 # IP FILTERING CODE UTK KEAMANAN
 # LOCALHOST ORIGINAL
 ALLOWED_IPS = [
-  "127.0.0.1","192.168.7.180", "192.168.100.9", "192.168.50.163", "192.168.7.137"
+  "127.0.0.1","192.168.7.180", "192.168.100.9", "192.168.50.163", "192.168.31.183"
 ]
 
 # Ijinkan IP Tailscale
@@ -183,4 +183,4 @@ if __name__ == "__main__":
   import uvicorn
   # Cara jalanin dgn Reload
   # uvicorn main:app --reload --host 192.168.100.11 --port 5500
-  uvicorn.run(app, host="0.0.0.0", port=5500)
+  uvicorn.run(app, host="192.168.31.183", port=5500)
