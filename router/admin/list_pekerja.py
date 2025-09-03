@@ -3,6 +3,7 @@ import traceback
 from typing import List, Optional
 import uuid
 import aiofiles
+import aiomysql
 from fastapi import APIRouter, Depends, File, Form, Path, Request, HTTPException, Security, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from koneksi import get_db
@@ -311,7 +312,7 @@ async def update_occupied(request: Request):
 
     pool = await get_db()
     async with pool.acquire() as conn:
-      async with conn.cursor() as cursor:
+      async with conn.cursor(aiomysql.DictCursor) as cursor:
         await conn.begin()
 
         query = "UPDATE karyawan SET is_occupied = %s WHERE id_karyawan = %s"
