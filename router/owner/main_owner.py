@@ -448,23 +448,33 @@ async def exportExcel(
 
           q1 = f"""
             SELECT ROW_NUMBER() OVER (ORDER BY mt.created_at) as no,mt.id_transaksi, mt.created_at AS tgl_beli, mt.jenis_transaksi, r.nama_ruangan AS kamar, 
-            k_terapis.nama_karyawan AS terapis, CASE WHEN mt.jenis_pembayaran = 0 THEN 'pembayaran diawal' 
+            COALESCE(terapis.nama_terapis, '') AS Terapis, CASE WHEN mt.jenis_pembayaran = 0 THEN 'pembayaran diawal' 
             ELSE 'pembayaran diakhir' END AS tipe_pembayaran,
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 0 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_paket dtp WHERE dtp.id_transaksi = mt. id_transaksi) AS INTEGER) + 
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 0 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_produk dtpr WHERE dtpr.id_transaksi = mt. id_transaksi) AS INTEGER) +
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 0 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt. id_transaksi) AS INTEGER) AS Pembelian_Awal
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 0 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_paket dtp WHERE dtp.id_transaksi = mt.id_transaksi) AS INTEGER) + 
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 0 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_produk dtpr WHERE dtpr.id_transaksi = mt.id_transaksi) AS INTEGER) +
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 0 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt.id_transaksi) AS INTEGER) AS Pembelian_Awal
             ,
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_paket dtp WHERE dtp.id_transaksi = mt. id_transaksi) AS INTEGER) + 
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_produk dtpr WHERE dtpr.id_transaksi = mt. id_transaksi) AS INTEGER) +
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt. id_transaksi) AS INTEGER) AS Addon
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_paket dtp WHERE dtp.id_transaksi = mt.id_transaksi) AS INTEGER) + 
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_produk dtpr WHERE dtpr.id_transaksi = mt.id_transaksi) AS INTEGER) +
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt.id_transaksi) AS INTEGER) AS Addon
             ,
             (mt.total_harga + 
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_paket dtp WHERE dtp.id_transaksi = mt. id_transaksi) AS INTEGER) + 
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_produk dtpr WHERE dtpr.id_transaksi = mt. id_transaksi) AS INTEGER) +
-            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt. id_transaksi) AS INTEGER)) as total_harga, 
-            mt.disc, mt.grand_total, mt.gtotal_stlh_pajak AS bayar
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_paket dtp WHERE dtp.id_transaksi = mt.id_transaksi) AS INTEGER) + 
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_produk dtpr WHERE dtpr.id_transaksi = mt.id_transaksi) AS INTEGER) +
+            CAST((SELECT COALESCE(SUM(CASE WHEN is_addon = 1 THEN harga_total ELSE 0 END), 0) FROM detail_transaksi_fnb dtfnb WHERE dtfnb.id_transaksi = mt.id_transaksi) AS INTEGER)) as total_harga,
+            mt.disc,mt.harga_vip as harga_ruangan, mt.grand_total, mt.gtotal_stlh_pajak AS bayar
             FROM main_transaksi mt
             LEFT JOIN ruangan r ON mt.id_ruangan = r.id_ruangan
+            LEFT JOIN (
+              SELECT id_transaksi, 
+              GROUP_CONCAT(DISTINCT nama_terapis SEPARATOR ', ') AS nama_terapis 
+              FROM (SELECT dtt.id_transaksi, k_main2.nama_karyawan AS nama_terapis FROM detail_terapis_transaksi dtt LEFT JOIN karyawan k_main2 ON dtt.id_terapis = k_main2.id_karyawan
+
+              UNION ALL
+
+              SELECT mt.id_transaksi, k_main.nama_karyawan AS nama_terapis FROM main_transaksi mt LEFT JOIN karyawan k_main ON mt.id_terapis = k_main.id_karyawan
+              ) AS combined_terapis GROUP BY id_transaksi 
+              ) AS terapis ON terapis.id_transaksi = mt.id_transaksi
             -- JOIN tabel yang sama
             LEFT JOIN karyawan k ON mt.id_resepsionis = k.id_karyawan
             LEFT JOIN karyawan k_terapis ON mt.id_terapis = k_terapis.id_karyawan

@@ -440,6 +440,10 @@ async def get_detail(
           member_item = await cursor.fetchall()
           print("member_item results:", member_item)
 
+          q_harga_room = "SELECT harga_vip FROM main_transaksi WHERE id_transaksi = %s"
+          await cursor.execute(q_harga_room, (id_trans, ))
+          harga_room = await cursor.fetchall()
+
           # proses field product
           product_ori = [item for item in product_items if item['is_addon'] == 0]
           product_addon = []
@@ -477,7 +481,8 @@ async def get_detail(
             "detail_fasilitas": fasilitas_ori,
             "detail_member": member_ori,
             # satuin semua listnya
-            "all_addon": product_addon + paket_addon + food_addon 
+            "all_addon": product_addon + paket_addon + food_addon,
+            "harga_ruangan": harga_room
           }
         except aiomysqlerror as e:
           return JSONResponse({"Error aiomysql Detail": str(e)}, status_code=500)
